@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # ---------------------------------------------------
 # run.sh - DroidHarvester Interactive APK Harvester
 # ---------------------------------------------------
@@ -7,17 +7,24 @@
 # ---------------------------------------------------
 
 set -euo pipefail
-trap 'echo "ERROR: Aborted at line $LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+LOG_LEVEL="INFO"
+if [[ "${1:-}" == "--debug" ]]; then
+    LOG_LEVEL="DEBUG"
+fi
+export LOG_LEVEL
 
 # ---------------------------------------------------
 # Load config + libs
 # ---------------------------------------------------
 source "$SCRIPT_DIR/config.sh"
 
-for lib in logging device apk_utils metadata report menu_util; do
+for lib in deps logging device apk_utils metadata report menu_util; do
+    # shellcheck disable=SC1090
     source "$SCRIPT_DIR/lib/$lib.sh"
 done
 
@@ -34,22 +41,16 @@ JSON_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.json"
 TXT_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.txt"
 
 DEVICE=""
-DEVICE_DIR=""
 CUSTOM_PACKAGES_FILE="$SCRIPT_DIR/custom_packages.txt"
 CUSTOM_PACKAGES=()
 [[ -f "$CUSTOM_PACKAGES_FILE" ]] && mapfile -t CUSTOM_PACKAGES < "$CUSTOM_PACKAGES_FILE"
 
-# ---------------------------------------------------
-# Setup / Checks
-# ---------------------------------------------------
-check_dependencies() {
-    for cmd in adb jq sha256sum md5sum sha1sum zip column; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            log ERROR "Missing dependency: $cmd"
-            exit 1
-        fi
-    done
-}
+PKGS_FOUND=0
+PKGS_PULLED=0
+LAST_TXT_REPORT=""
+DEVICE_FINGERPRINT=""
+SESSION_ID="$TIMESTAMP"
+export DEVICE_FINGERPRINT SESSION_ID
 
 session_metadata() {
     {
@@ -67,46 +68,14 @@ session_metadata() {
 # ---------------------------------------------------
 # Menu functions
 # ---------------------------------------------------
-choose_device() {
-    local devices
-    devices=$(adb devices | awk 'NR>1 && $2=="device" {print $1}')
-    if [[ -z "$devices" ]]; then
-        log WARN "No devices detected."
-        return
-    fi
-
-    draw_menu_header "Device Selection"
-    local i=1
-    for d in $devices; do
-        echo "  [$i] $d"
-        ((i++))
-    done
-    echo "--------------------------------------------------"
-    read -rp "Select device [1-$((i-1))]: " choice
-    DEVICE=$(echo "$devices" | sed -n "${choice}p")
-
-    if [[ -z "$DEVICE" ]]; then
-        log ERROR "Invalid device choice."
-        return
-    fi
-
-    DEVICE_DIR="$RESULTS_DIR/$DEVICE"
-    mkdir -p "$DEVICE_DIR"
-    init_report
-    log SUCCESS "Using device: $DEVICE"
-    log INFO "Output directory: $DEVICE_DIR"
-
-    if [[ "${INCLUDE_DEVICE_PROFILE:-false}" == "true" ]]; then
-        adb -s "$DEVICE" shell getprop | tee -a "$LOGFILE" > "$DEVICE_DIR/device_profile.txt"
-        log INFO "Device profile saved: $DEVICE_DIR/device_profile.txt"
-    fi
-}
 
 scan_apps() {
     [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
     log INFO "Scanning for target apps..."
+    local pkg_list
+    pkg_list=$(adb_shell pm list packages) || return
     for pkg in "${TARGET_PACKAGES[@]}"; do
-        if adb -s "$DEVICE" shell pm list packages | grep -q "$pkg"; then
+        if grep -Fq -- "$pkg" <<< "$pkg_list"; then
             log SUCCESS "Found: $pkg"
         else
             log WARN "Not installed: $pkg"
@@ -134,43 +103,64 @@ harvest() {
         return
     fi
 
+    PKGS_FOUND=0
+    PKGS_PULLED=0
     for pkg in "${all_pkgs[@]}"; do
         log INFO "Checking $pkg..."
         apk_paths=$(get_apk_paths "$pkg")
         if [[ -n "$apk_paths" ]]; then
+            ((PKGS_FOUND++))
+            local pulled=0
             while read -r path; do
                 [[ -z "$path" ]] && continue
                 log INFO "Found APK: $path"
                 outfile=$(pull_apk "$pkg" "$path")
-                [[ -n "$outfile" ]] && apk_metadata "$pkg" "$outfile"
+                if [[ -n "$outfile" ]]; then
+                    pulled=1
+                    apk_metadata "$pkg" "$outfile"
+                fi
             done <<< "$apk_paths"
+            ((pulled)) && ((PKGS_PULLED++))
         else
             log WARN "Not installed: $pkg"
         fi
     done
 
     finalize_report "all"
+    LAST_TXT_REPORT="$TXT_REPORT"
     log SUCCESS "Harvest complete. Reports written to $RESULTS_DIR"
 }
 
 list_installed_apps() {
     [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
     log INFO "Listing installed apps..."
-    adb -s "$DEVICE" shell pm list packages | sed 's/package://g' | sort
+    adb_shell pm list packages | sed 's/package://g' | sort
 }
 
 search_installed_apps() {
     [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
     read -rp "Enter search keyword: " keyword
+    if [[ -z "$keyword" ]]; then
+        log WARN "No keyword entered."
+        return
+    fi
     log INFO "Searching for '$keyword'..."
-    adb -s "$DEVICE" shell pm list packages | grep -i "$keyword" | sed 's/package://g'
+    local results
+    results=$(adb_shell pm list packages | grep -Fi -- "$keyword" | sed 's/package://g')
+    if [[ -n "$results" ]]; then
+        echo "$results"
+    else
+        log WARN "No packages match '$keyword'"
+    fi
 }
 
 view_report() {
-    latest=$(ls -t "$RESULTS_DIR"/apks_report_*.txt  2>/dev/null | head -n1 || true)
+    local latest
+    latest=$(latest_report)
     if [[ -z "$latest" ]]; then
         log WARN "No reports found."
     else
+        LAST_TXT_REPORT="$latest"
         echo
         echo "--------------------------------------------------"
         echo " Last Report (Preview)"
@@ -181,9 +171,42 @@ view_report() {
     fi
 }
 
+cleanup_partial_run() {
+    if [[ -z "$DEVICE_DIR" || ! -d "$DEVICE_DIR" ]]; then
+        log WARN "No device directory to clean."
+        return
+    fi
+    read -rp "Remove $DEVICE_DIR? [y/N]: " ans
+    case "$ans" in
+        [Yy]*) rm -rf "$DEVICE_DIR"; log SUCCESS "Removed $DEVICE_DIR"; DEVICE="" ;; 
+        *) log WARN "Cleanup cancelled." ;;
+    esac
+}
+
+resume_last_session() {
+    local last_dev
+    last_dev=$(find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | xargs -0 stat --printf '%Y\t%n\0' 2>/dev/null | sort -z -nr | head -z -n1 | cut -f2- | tr -d '\0')
+    if [[ -z "$last_dev" ]]; then
+        log WARN "No previous session found."
+        return
+    fi
+    DEVICE=$(basename "$last_dev")
+    DEVICE_DIR="$last_dev"
+    init_report
+    log SUCCESS "Resumed device: $DEVICE"
+}
+
 export_report() {
     local zipfile="$RESULTS_DIR/apk_harvest_${TIMESTAMP}.zip"
-    zip -j "$zipfile" "$REPORT" "$JSON_REPORT" "$TXT_REPORT" "$LOGFILE" >/dev/null
+    local files=()
+    for f in "$REPORT" "$JSON_REPORT" "$TXT_REPORT" "$LOGFILE"; do
+        [[ -f "$f" ]] && files+=("$f")
+    done
+    if [[ ${#files[@]} -eq 0 ]]; then
+        log WARN "No reports to export. Run a harvest first."
+        return
+    fi
+    zip -j "$zipfile" "${files[@]}" >/dev/null
     log SUCCESS "Exported report bundle: $zipfile"
 }
 
@@ -194,8 +217,12 @@ check_dependencies
 session_metadata
 
 while true; do
+    LAST_TXT_REPORT=$(latest_report)
     draw_menu_header "DroidHarvester Main Menu"
-    echo " Device: ${DEVICE:-Not selected}"
+    echo " Device      : ${DEVICE:-Not selected}"
+    echo " Last report : ${LAST_TXT_REPORT:-None}"
+    echo " Harvested   : found $PKGS_FOUND pulled $PKGS_PULLED"
+    echo " Targets     : ${#TARGET_PACKAGES[@]} default / ${#CUSTOM_PACKAGES[@]} custom"
     echo
     show_menu \
         "Choose device" \
@@ -206,8 +233,10 @@ while true; do
         "List ALL installed apps" \
         "Search installed apps" \
         "Export report bundle" \
+        "Resume last session" \
+        "Clean up partial run" \
         "Exit"
-    choice=$(read_choice 9)
+    choice=$(read_choice 11)
 
     case $choice in
         1) choose_device ;;
@@ -218,7 +247,9 @@ while true; do
         6) list_installed_apps ;;
         7) search_installed_apps ;;
         8) export_report ;;
-        9) log INFO "Exiting DroidHarvester."; exit 0 ;;
+        9) resume_last_session ;;
+        10) cleanup_partial_run ;;
+        11) log INFO "Exiting DroidHarvester."; exit 0 ;;
     esac
 
     draw_menu_footer

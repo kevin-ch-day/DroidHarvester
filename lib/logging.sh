@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # logging.sh - Logging and Usage Helpers
 # ---------------------------------------------------
@@ -17,12 +19,17 @@ if [[ -z "${LOGFILE:-}" ]]; then
     LOGFILE="$LOGS_DIR/harvest_log_$TIMESTAMP.txt"
 fi
 
+export E_NO_DEVICE=1
+export E_PULL_FAIL=2
+export E_DUMPSYS_FAIL=3
+
 # ---------------------------------------------------
 # Logging Function
 # ---------------------------------------------------
 log() {
     local level="$1"; shift
-    local msg="[$(date +'%H:%M:%S')] $*"
+    local msg
+    msg="[$(date +'%H:%M:%S')] $*"
 
     # Strip ANSI codes before writing to logfile (clean text log)
     local clean_msg

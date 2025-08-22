@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # lib/apk_utils.sh
 # Handles APK discovery and pulling from device
@@ -10,10 +12,10 @@ get_apk_paths() {
 
     # "pm path" may return multiple lines (for split APKs)
     local paths
-    paths=$(adb -s "$DEVICE" shell pm path "$pkg" 2>/dev/null | tr -d '\r' | sed 's/package://g' || true)
+    paths=$(adb_shell pm path "$pkg" 2>/dev/null | tr -d '\r' | sed 's/package://g' || true)
 
     if [[ -z "$paths" ]]; then
-        log "ERROR: No APK paths found for package $pkg"
+        log ERROR "No APK paths found for package $pkg"
         return 1
     fi
 
@@ -35,7 +37,7 @@ pull_apk() {
 
     # Confirm file exists on device
     if ! adb -s "$DEVICE" shell "[ -f \"$apk_path\" ]" >/dev/null 2>&1; then
-        log "WARN: File not found on device: $apk_path"
+        log WARN "File not found on device: $apk_path"
         return 1
     fi
 
@@ -46,30 +48,38 @@ pull_apk() {
 
     while (( attempts < max_attempts )); do
         attempts=$((attempts+1))
-        log "INFO: Pulling $apk_path (attempt $attempts of $max_attempts)..."
+        log INFO "Pulling $apk_path (attempt $attempts of $max_attempts)..."
 
         if adb -s "$DEVICE" pull "$apk_path" "$outfile" >/dev/null 2>&1; then
             if [[ -s "$outfile" ]]; then
                 success=1
                 break
             else
-                log "WARN: Pulled file is empty: $outfile"
+                log WARN "Pulled file is empty: $outfile"
             fi
         else
-            log "WARN: Pull command failed for $apk_path"
+            log WARN "Pull command failed for $apk_path"
+            if ! adb devices | awk 'NR>1 && $2=="device" {print $1}' | grep -qx "$DEVICE"; then
+                read -rp "Device disconnected. retry or reselect device? [r/s]: " ans
+                case "$ans" in
+                    r|R) continue ;;
+                    s|S) choose_device; return 1 ;;
+                    *)   log ERROR "E_NO_DEVICE: device unavailable"; return "$E_NO_DEVICE" ;;
+                esac
+            fi
         fi
 
         sleep 1
     done
 
     if (( success == 0 )); then
-        log "ERROR: Failed to pull $apk_path after $max_attempts attempts"
+        log ERROR "E_PULL_FAIL: Failed to pull $apk_path after $max_attempts attempts"
         return 1
     fi
 
     # Verify file size
     local fsize
     fsize=$(stat -c%s "$outfile" 2>/dev/null || echo 0)
-    log "INFO: Pulled $outfile (size: $fsize bytes)"
+    log INFO "Pulled $outfile (size: $fsize bytes)"
     echo "$outfile"
 }

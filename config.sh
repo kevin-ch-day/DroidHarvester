@@ -1,5 +1,8 @@
 #!/bin/bash
 # ---------------------------------------------------
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # config.sh
 # Global configuration for DroidHarvester
 # ---------------------------------------------------

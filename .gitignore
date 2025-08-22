@@ -1,0 +1,5 @@
+results/
+logs/
+*.apk
+*.zip
+*.tmp

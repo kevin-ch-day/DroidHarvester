@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 apk_metadata() {
     local pkg="$1"
     local outfile="$2"
@@ -25,7 +27,7 @@ apk_metadata() {
         # Only parse detailed info for base.apk to avoid duplicates
         if [[ "$(basename "$outfile")" == "base.apk" ]]; then
             local info
-            info=$(adb -s "$DEVICE" shell dumpsys package "$pkg" 2>/dev/null || true)
+            info=$(adb_shell dumpsys package "$pkg" 2>/dev/null || true)
 
             version=$(echo "$info" | grep versionName | head -n1 | awk -F= '{print $2}' | xargs)
             versionCode=$(echo "$info" | grep versionCode | head -n1 | grep -o '[0-9]\+' | xargs)
@@ -45,25 +47,27 @@ apk_metadata() {
         # -----------------------------
         # Logging
         # -----------------------------
-        log "INFO  ✅ Metadata for $pkg → $(basename "$outfile")"
-        log "      File        : $outfile"
-        log "      SHA256      : $sha256"
-        log "      SHA1        : $sha1"
-        log "      MD5         : $md5"
-        log "      Size        : $size bytes"
-        log "      Perms       : $perms"
-        log "      Modified    : $mtime"
-        [[ "$version" != "unknown" ]] && log "      Version     : $version (code: $versionCode, targetSdk: $targetSdk)"
-        [[ "$installer" != "unknown" ]] && log "      Installer   : $installer"
-        [[ "$firstInstall" != "unknown" ]] && log "      FirstInstall: $firstInstall"
-        [[ "$lastUpdate" != "unknown" ]] && log "      LastUpdate  : $lastUpdate"
-        [[ "$uid" != "unknown" ]] && log "      UID         : $uid"
-        log "      InstallType : $installType"
+        log INFO "✅ Metadata for $pkg → $(basename "$outfile")"
+        log INFO "      File        : $outfile"
+        log INFO "      SHA256      : $sha256"
+        log INFO "      SHA1        : $sha1"
+        log INFO "      MD5         : $md5"
+        log INFO "      Size        : $size bytes"
+        log INFO "      Perms       : $perms"
+        log INFO "      Modified    : $mtime"
+        [[ "$version" != "unknown" ]] && log INFO "      Version     : $version (code: $versionCode, targetSdk: $targetSdk)"
+        [[ "$installer" != "unknown" ]] && log INFO "      Installer   : $installer"
+        [[ "$firstInstall" != "unknown" ]] && log INFO "      FirstInstall: $firstInstall"
+        [[ "$lastUpdate" != "unknown" ]] && log INFO "      LastUpdate  : $lastUpdate"
+        [[ "$uid" != "unknown" ]] && log INFO "      UID         : $uid"
+        log INFO "      InstallType : $installType"
 
         # -----------------------------
         # CSV Report
         # -----------------------------
-        echo "$pkg,$outfile,$sha256,$sha1,$md5,$size,$perms,$mtime,$version,$versionCode,$targetSdk,$installer,$firstInstall,$lastUpdate,$uid,$installType" >> "$REPORT"
+        echo "$pkg,$outfile,$sha256,$sha1,$md5,$size,$perms,$mtime,$version,$versionCode,$targetSdk,$installer,$firstInstall,$lastUpdate,$uid,$installType,TBD" >> "$REPORT"
+
+        append_txt_report "$pkg" "$outfile" "$sha256" "$sha1" "$md5" "$size" "$version" "$versionCode" "$targetSdk" "$installer" "$installType"
 
         # -----------------------------
         # JSON Report
@@ -85,7 +89,8 @@ apk_metadata() {
           --arg lastUpdate "$lastUpdate" \
           --arg uid "$uid" \
           --arg installType "$installType" \
-          '{package:$pkg,file:$file,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType}' \
+          --arg findings "TBD" \
+          '{package:$pkg,file:$file,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType,findings:$findings}' \
           >> "$JSON_REPORT.tmp"
     fi
 }

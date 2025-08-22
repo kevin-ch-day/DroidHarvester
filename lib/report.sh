@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # report.sh - Report initialization and finalization
 # ---------------------------------------------------
@@ -9,8 +11,17 @@ init_report() {
     mkdir -p "$DEVICE_DIR"
     touch "$LOGFILE"
 
-    # CSV header
-    echo "package,file,sha256,sha1,md5,size,version,versionCode,targetSdk,installer,installType" > "$REPORT"
+    # CSV header with session metadata
+    {
+        echo "# SessionID,$SESSION_ID"
+        echo "# Host,$(hostname)"
+        echo "# User,$(whoami)"
+        echo "# OS,$(uname -srvmo)"
+        echo "# Device,$DEVICE"
+        echo "# Fingerprint,$DEVICE_FINGERPRINT"
+        echo "# Log,$LOGFILE"
+        echo "package,file,sha256,sha1,md5,size,perms,modified,version,versionCode,targetSdk,installer,firstInstall,lastUpdate,uid,installType,findings"
+    } > "$REPORT"
     
     # JSON temp
     : > "$JSON_REPORT.tmp"
@@ -21,8 +32,13 @@ init_report() {
         echo "============================================================"
         echo "                     APK HARVEST REPORT"
         echo "============================================================"
+        echo "Session ID  : $SESSION_ID"
         echo "Generated   : $(date)"
+        echo "Host        : $(hostname)"
+        echo "User        : $(whoami)"
+        echo "OS          : $(uname -srvmo)"
         echo "Device ID   : ${DEVICE:-unknown}"
+        echo "Fingerprint : ${DEVICE_FINGERPRINT:-unknown}"
         echo "Log File    : $LOGFILE"
         echo "Output Path : $DEVICE_DIR"
         echo "============================================================"
@@ -44,6 +60,15 @@ init_report() {
         echo "    its associated attributes."
         echo "------------------------------------------------------------"
     } > "$TXT_REPORT"
+}
+
+latest_report() {
+    find "$RESULTS_DIR" -maxdepth 1 -type f -name 'apks_report_*.txt' -print0 \
+        | xargs -0 stat --printf '%Y\t%n\0' 2>/dev/null \
+        | sort -z -nr \
+        | tr '\0' '\n' \
+        | head -n1 \
+        | cut -f2- || true
 }
 
 append_txt_report() {
@@ -71,6 +96,7 @@ append_txt_report() {
         echo "Target SDK   : $targetSdk"
         echo "Installer    : $installer"
         echo "Install Type : $installType"
+        echo "Findings Summary : TBD"
         echo "------------------------------------------------------------"
     } >> "$TXT_REPORT"
 }
@@ -78,7 +104,8 @@ append_txt_report() {
 finalize_report() {
     local mode="${1:-txt}"  # default = txt
 
-    local pkg_count=$(tail -n +2 "$REPORT" | wc -l)
+    local pkg_count
+    pkg_count=$(tail -n +2 "$REPORT" | wc -l)
     {
         echo
         echo "Section IV. Summary"
@@ -96,14 +123,23 @@ finalize_report() {
     } >> "$TXT_REPORT"
 
     if [[ "$mode" == *"csv"* || "$mode" == "both" || "$mode" == "all" ]]; then
-        log "CSV report saved: $REPORT"
+        log INFO "CSV report saved: $REPORT"
     fi
     if [[ "$mode" == *"json"* || "$mode" == "both" || "$mode" == "all" ]]; then
-        jq -s '.' "$JSON_REPORT.tmp" > "$JSON_REPORT"
-        rm -f "$JSON_REPORT.tmp"
-        log "JSON report saved: $JSON_REPORT"
+        jq -s \
+            --arg sid "$SESSION_ID" \
+            --arg host "$(hostname)" \
+            --arg user "$(whoami)" \
+            --arg os "$(uname -srvmo)" \
+            --arg device "$DEVICE" \
+            --arg fp "$DEVICE_FINGERPRINT" \
+            --arg log "$LOGFILE" \
+            '{session:{id:$sid,host:$host,user:$user,os:$os,device:$device,fingerprint:$fp,log:$log},apps:.}' \
+            "$JSON_REPORT.tmp" > "$JSON_REPORT"
+        log INFO "JSON report saved: $JSON_REPORT"
     fi
     if [[ "$mode" == *"txt"* || "$mode" == "all" ]]; then
-        log "TXT report saved: $TXT_REPORT"
+        log INFO "TXT report saved: $TXT_REPORT"
     fi
+    rm -f "$JSON_REPORT.tmp"
 }

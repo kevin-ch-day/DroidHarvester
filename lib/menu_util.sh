@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # menu_util.sh - Shared Menu Utilities for DroidHarvester
 # ---------------------------------------------------
@@ -47,7 +49,7 @@ read_choice() {
     local choice
 
     while true; do
-        read -rp "➤  Enter selection [1-$max]: " choice
+        read -rp "Enter selection [1-$max]: " choice
         if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice>=1 && choice<=max )); then
             echo "$choice"
             return
@@ -62,7 +64,7 @@ read_choice() {
 # ---------------------------------------------------
 pause() {
     echo
-    read -rp "⏸  Press ENTER to continue..." _
+    read -rp "Press ENTER to continue..." _
 }
 
 # ---------------------------------------------------
@@ -72,7 +74,7 @@ pause() {
 confirm() {
     local prompt="$1"
     echo
-    read -rp "⚠️  $prompt [y/N]: " ans
+    read -rp "WARNING: $prompt [y/N]: " ans
     case "$ans" in
         [Yy]*) return 0 ;;
         *)     return 1 ;;
