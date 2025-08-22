@@ -9,9 +9,6 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # in SOC-style environments where precision matters.
 # ---------------------------------------------------
 
-source "$SCRIPT_DIR/lib/colors.sh"
-source "$SCRIPT_DIR/lib/logging.sh"
-
 # ---------------------------------------------------
 # Draw Menu Header
 # ---------------------------------------------------
