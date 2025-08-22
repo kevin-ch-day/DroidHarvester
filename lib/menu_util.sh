@@ -54,7 +54,7 @@ read_choice() {
             echo "$choice"
             return
         else
-            log WARN "Invalid input. Enter a number between 1 and $max."
+            log WARN "Invalid input. Enter a number between 1 and $max." || true
         fi
     done
 }

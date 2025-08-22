@@ -27,6 +27,7 @@ export E_DUMPSYS_FAIL=3
 # Logging Function
 # ---------------------------------------------------
 log() {
+    local prev_status=$?
     local level="$1"; shift
     local msg
     msg="[$(date +'%H:%M:%S')] $*"
@@ -63,6 +64,7 @@ log() {
             echo "$clean_msg" >> "$LOGFILE"
             ;;
     esac
+    return "$prev_status"
 }
 
 # ---------------------------------------------------
