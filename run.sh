@@ -107,25 +107,26 @@ harvest() {
     PKGS_PULLED=0
     for pkg in "${all_pkgs[@]}"; do
         log INFO "Checking $pkg..."
-        apk_paths=$(get_apk_paths "$pkg")
-        if [[ -n "$apk_paths" ]]; then
-            ((PKGS_FOUND++))
-            local pulled=0
-              while read -r path; do
-                  if [[ -z "$path" ]]; then
-                      continue
-                  fi
-                  log INFO "Found APK: $path"
-                  outfile=$(pull_apk "$pkg" "$path")
-                  if [[ -n "$outfile" ]]; then
-                      pulled=1
-                      apk_metadata "$pkg" "$outfile"
-                  fi
-              done <<< "$apk_paths"
-            ((pulled)) && ((PKGS_PULLED++))
-        else
+        apk_paths=$(get_apk_paths "$pkg" || true)
+        lookup_status=${PIPESTATUS[0]}
+        if [[ $lookup_status -ne 0 || -z "$apk_paths" ]]; then
             log WARN "Not installed: $pkg" || true
+            continue
         fi
+        ((PKGS_FOUND++))
+        local pulled=0
+          while read -r path; do
+              if [[ -z "$path" ]]; then
+                  continue
+              fi
+              log INFO "Found APK: $path"
+              outfile=$(pull_apk "$pkg" "$path")
+              if [[ -n "$outfile" ]]; then
+                  pulled=1
+                  apk_metadata "$pkg" "$outfile"
+              fi
+          done <<< "$apk_paths"
+        ((pulled)) && ((PKGS_PULLED++))
     done
 
     finalize_report "all"
