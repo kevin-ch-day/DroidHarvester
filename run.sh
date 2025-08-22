@@ -107,7 +107,7 @@ harvest() {
     PKGS_PULLED=0
     for pkg in "${all_pkgs[@]}"; do
         log INFO "Checking $pkg..."
-        apk_paths=$(get_apk_paths "$pkg")
+        apk_paths=$(get_apk_paths "$pkg" || true)
         if [[ -n "$apk_paths" ]]; then
             ((PKGS_FOUND++))
             local pulled=0

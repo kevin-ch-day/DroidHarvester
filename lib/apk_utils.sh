@@ -15,8 +15,8 @@ get_apk_paths() {
     paths=$(adb_shell pm path "$pkg" 2>/dev/null | tr -d '\r' | sed 's/package://g' || true)
 
     if [[ -z "$paths" ]]; then
-        log ERROR "No APK paths found for package $pkg"
-        return 1
+        log WARN "No APK paths found for package $pkg"
+        return 0
     fi
 
     echo "$paths"
