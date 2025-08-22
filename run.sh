@@ -40,6 +40,8 @@ REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.csv"
 JSON_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.json"
 TXT_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.txt"
 
+trap cleanup_reports EXIT
+
 DEVICE=""
 CUSTOM_PACKAGES_FILE="$SCRIPT_DIR/custom_packages.txt"
 CUSTOM_PACKAGES=()
