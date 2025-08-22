@@ -141,5 +141,9 @@ finalize_report() {
     if [[ "$mode" == *"txt"* || "$mode" == "all" ]]; then
         log INFO "TXT report saved: $TXT_REPORT"
     fi
-    rm -f "$JSON_REPORT.tmp"
+    cleanup_reports
+}
+
+cleanup_reports() {
+    [[ -n "${JSON_REPORT:-}" ]] && rm -f "$JSON_REPORT.tmp"
 }
