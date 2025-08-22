@@ -37,7 +37,7 @@ pull_apk() {
 
     # Confirm file exists on device
     if ! adb -s "$DEVICE" shell "[ -f \"$apk_path\" ]" >/dev/null 2>&1; then
-        log WARN "File not found on device: $apk_path"
+        log WARN "File not found on device: $apk_path" || true
         return 1
     fi
 
@@ -55,10 +55,10 @@ pull_apk() {
                 success=1
                 break
             else
-                log WARN "Pulled file is empty: $outfile"
+                log WARN "Pulled file is empty: $outfile" || true
             fi
         else
-            log WARN "Pull command failed for $apk_path"
+            log WARN "Pull command failed for $apk_path" || true
             if ! adb devices | awk 'NR>1 && $2=="device" {print $1}' | grep -qx "$DEVICE"; then
                 read -rp "Device disconnected. retry or reselect device? [r/s]: " ans
                 case "$ans" in
