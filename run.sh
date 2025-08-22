@@ -81,7 +81,7 @@ scan_apps() {
         if grep -Fq -- "$pkg" <<< "$pkg_list"; then
             log SUCCESS "Found: $pkg"
         else
-            log WARN "Not installed: $pkg" || true
+            log WARN "Not installed: $pkg"
         fi
     done
 }
@@ -93,7 +93,7 @@ add_custom_package() {
         echo "$pkg" >> "$CUSTOM_PACKAGES_FILE"
         log SUCCESS "Added custom package: $pkg"
     else
-        log WARN "No package entered." || true
+        log WARN "No package entered."
     fi
 }
 
@@ -111,24 +111,23 @@ harvest() {
     for pkg in "${all_pkgs[@]}"; do
         log INFO "Checking $pkg..."
         apk_paths=$(get_apk_paths "$pkg" || true)
-        lookup_status=${PIPESTATUS[0]}
-        if [[ $lookup_status -ne 0 || -z "$apk_paths" ]]; then
-            log WARN "Not installed: $pkg" || true
+
+        if [[ -z "$apk_paths" ]]; then
+            log WARN "Not installed: $pkg"
             continue
         fi
+
         ((PKGS_FOUND++))
         local pulled=0
-          while read -r path; do
-              if [[ -z "$path" ]]; then
-                  continue
-              fi
-              log INFO "Found APK: $path"
-              outfile=$(pull_apk "$pkg" "$path")
-              if [[ -n "$outfile" ]]; then
-                  pulled=1
-                  apk_metadata "$pkg" "$outfile"
-              fi
-          done <<< "$apk_paths"
+        while read -r path; do
+            [[ -z "$path" ]] && continue
+            log INFO "Found APK: $path"
+            outfile=$(pull_apk "$pkg" "$path")
+            if [[ -n "$outfile" ]]; then
+                pulled=1
+                apk_metadata "$pkg" "$outfile"
+            fi
+        done <<< "$apk_paths"
         ((pulled)) && ((PKGS_PULLED++))
     done
 
@@ -156,7 +155,7 @@ search_installed_apps() {
     if [[ -n "$results" ]]; then
         echo "$results"
     else
-        log WARN "No packages match '$keyword'" || true
+        log WARN "No packages match '$keyword'"
     fi
 }
 
@@ -173,12 +172,12 @@ view_report() {
         echo "--------------------------------------------------"
         head -n 40 "$latest"
         echo "--------------------------------------------------"
-        log INFO "Full report: $latest" || true
+        log INFO "Full report: $latest"
     fi
 }
 
 cleanup_partial_run() {
-    if [[ -z "$DEVICE_DIR" || ! -d "$DEVICE_DIR" ]]; then
+    if [[ -z "${DEVICE_DIR:-}" || ! -d "$DEVICE_DIR" ]]; then
         log WARN "No device directory to clean."
         return
     fi
@@ -191,7 +190,12 @@ cleanup_partial_run() {
 
 resume_last_session() {
     local last_dev
-    last_dev=$(find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | xargs -0 stat --printf '%Y\t%n\0' 2>/dev/null | sort -z -nr | head -z -n1 | cut -f2- | tr -d '\0')
+    last_dev=$(find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 -type d -print0 \
+        | xargs -0 stat --printf '%Y\t%n\0' 2>/dev/null \
+        | sort -z -nr \
+        | head -z -n1 \
+        | cut -f2- \
+        | tr -d '\0')
     if [[ -z "$last_dev" ]]; then
         log WARN "No previous session found."
         return
