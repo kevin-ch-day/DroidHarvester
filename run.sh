@@ -23,7 +23,6 @@ export LOG_LEVEL
 # Load config + libs
 # ---------------------------------------------------
 source "$SCRIPT_DIR/config.sh"
-
 for lib in deps logging device apk_utils metadata report menu_util; do
     # shellcheck disable=SC1090
     source "$SCRIPT_DIR/lib/$lib.sh"
@@ -76,7 +75,10 @@ scan_apps() {
     [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
     log INFO "Scanning for target apps..."
     local pkg_list
-    pkg_list=$(adb_shell pm list packages) || return
+    if ! pkg_list="$(adb_shell pm list packages)"; then
+        log ERROR "E_PM_LIST: failed to list packages"
+        return
+    fi
     for pkg in "${TARGET_PACKAGES[@]}"; do
         if grep -Fq -- "$pkg" <<< "$pkg_list"; then
             log SUCCESS "Found: $pkg"
@@ -100,7 +102,6 @@ add_custom_package() {
 harvest() {
     [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
     local all_pkgs=("${TARGET_PACKAGES[@]}" "${CUSTOM_PACKAGES[@]}")
-
     if [[ ${#all_pkgs[@]} -eq 0 ]]; then
         log WARN "No packages selected."
         return
@@ -108,26 +109,37 @@ harvest() {
 
     PKGS_FOUND=0
     PKGS_PULLED=0
+
+    local pkg apk_paths path outfile pulled
     for pkg in "${all_pkgs[@]}"; do
         log INFO "Checking $pkg..."
-        apk_paths=$(get_apk_paths "$pkg" || true)
 
-        if [[ -z "$apk_paths" ]]; then
-            log WARN "Not installed: $pkg"
+        if ! apk_paths="$(get_apk_paths "$pkg")"; then
+            log WARN "Not installed or no paths: $pkg"
             continue
         fi
+        [[ -z "$apk_paths" ]] && { log WARN "No APK paths found: $pkg"; continue; }
 
         ((PKGS_FOUND++))
-        local pulled=0
-        while read -r path; do
+        pulled=0
+
+        # Iterate each path safely
+        while IFS= read -r path; do
             [[ -z "$path" ]] && continue
             log INFO "Found APK: $path"
-            outfile=$(pull_apk "$pkg" "$path")
+
+            # Do not let set -e kill the session on a single failure
+            if ! outfile="$(pull_apk "$pkg" "$path")"; then
+                log ERROR "E_PULL_FAIL: $pkg -> $path"
+                continue
+            fi
+
             if [[ -n "$outfile" ]]; then
                 pulled=1
                 apk_metadata "$pkg" "$outfile"
             fi
         done <<< "$apk_paths"
+
         ((pulled)) && ((PKGS_PULLED++))
     done
 
@@ -151,7 +163,7 @@ search_installed_apps() {
     fi
     log INFO "Searching for '$keyword'..."
     local results
-    results=$(adb_shell pm list packages | grep -Fi -- "$keyword" | sed 's/package://g')
+    results=$(adb_shell pm list packages | grep -Fi -- "$keyword" | sed 's/package://g' || true)
     if [[ -n "$results" ]]; then
         echo "$results"
     else
@@ -183,8 +195,8 @@ cleanup_partial_run() {
     fi
     read -rp "Remove $DEVICE_DIR? [y/N]: " ans
     case "$ans" in
-        [Yy]*) rm -rf "$DEVICE_DIR"; log SUCCESS "Removed $DEVICE_DIR"; DEVICE="" ;; 
-        *) log WARN "Cleanup cancelled." ;;
+        [Yy]*) rm -rf "$DEVICE_DIR"; log SUCCESS "Removed $DEVICE_DIR"; DEVICE="" ;;
+        *)     log WARN "Cleanup cancelled." ;;
     esac
 }
 
@@ -232,6 +244,7 @@ while true; do
     if [[ -n "$LAST_TXT_REPORT" ]]; then
         header_report="$(basename "$LAST_TXT_REPORT")"
     fi
+
     draw_menu_header "DroidHarvester Main Menu" "$DEVICE" "$header_report"
     echo " Harvested   : found $PKGS_FOUND pulled $PKGS_PULLED"
     echo " Targets     : ${#TARGET_PACKAGES[@]} default / ${#CUSTOM_PACKAGES[@]} custom"
