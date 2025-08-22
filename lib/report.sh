@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # report.sh - Report initialization and finalization
@@ -141,5 +142,9 @@ finalize_report() {
     if [[ "$mode" == *"txt"* || "$mode" == "all" ]]; then
         log INFO "TXT report saved: $TXT_REPORT"
     fi
-    rm -f "$JSON_REPORT.tmp"
+    cleanup_reports
+}
+
+cleanup_reports() {
+    [[ -n "${JSON_REPORT:-}" ]] && rm -f "$JSON_REPORT.tmp"
 }
