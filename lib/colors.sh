@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 set -euo pipefail
+set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # lib/colors.sh
