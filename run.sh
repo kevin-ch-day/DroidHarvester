@@ -218,9 +218,11 @@ session_metadata
 
 while true; do
     LAST_TXT_REPORT=$(latest_report)
-    draw_menu_header "DroidHarvester Main Menu"
-    echo " Device      : ${DEVICE:-Not selected}"
-    echo " Last report : ${LAST_TXT_REPORT:-None}"
+    header_report=""
+    if [[ -n "$LAST_TXT_REPORT" ]]; then
+        header_report="$(basename "$LAST_TXT_REPORT")"
+    fi
+    draw_menu_header "DroidHarvester Main Menu" "$DEVICE" "$header_report"
     echo " Harvested   : found $PKGS_FOUND pulled $PKGS_PULLED"
     echo " Targets     : ${#TARGET_PACKAGES[@]} default / ${#CUSTOM_PACKAGES[@]} custom"
     echo
