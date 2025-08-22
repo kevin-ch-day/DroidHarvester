@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+
+csv_escape() {
+    local q='"'
+    local str=${1//$q/$q$q}
+    printf '"%s"' "$str"
+}
+
 apk_metadata() {
     local pkg="$1"
     local outfile="$2"
@@ -65,7 +72,24 @@ apk_metadata() {
         # -----------------------------
         # CSV Report
         # -----------------------------
-        echo "$pkg,$outfile,$sha256,$sha1,$md5,$size,$perms,$mtime,$version,$versionCode,$targetSdk,$installer,$firstInstall,$lastUpdate,$uid,$installType,TBD" >> "$REPORT"
+        printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+            "$(csv_escape "$pkg")" \
+            "$(csv_escape "$outfile")" \
+            "$(csv_escape "$sha256")" \
+            "$(csv_escape "$sha1")" \
+            "$(csv_escape "$md5")" \
+            "$(csv_escape "$size")" \
+            "$(csv_escape "$perms")" \
+            "$(csv_escape "$mtime")" \
+            "$(csv_escape "$version")" \
+            "$(csv_escape "$versionCode")" \
+            "$(csv_escape "$targetSdk")" \
+            "$(csv_escape "$installer")" \
+            "$(csv_escape "$firstInstall")" \
+            "$(csv_escape "$lastUpdate")" \
+            "$(csv_escape "$uid")" \
+            "$(csv_escape "$installType")" \
+            "$(csv_escape "TBD")" >> "$REPORT"
 
         append_txt_report "$pkg" "$outfile" "$sha256" "$sha1" "$md5" "$size" "$version" "$versionCode" "$targetSdk" "$installer" "$installType"
 
