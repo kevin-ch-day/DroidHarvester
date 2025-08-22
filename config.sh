@@ -1,8 +1,7 @@
-#!/bin/bash
-# ---------------------------------------------------
 #!/usr/bin/env bash
 set -euo pipefail
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+# ---------------------------------------------------
 # config.sh
 # Global configuration for DroidHarvester
 # ---------------------------------------------------
@@ -57,6 +56,7 @@ fi
 
 # Hash algorithms to compute
 # Extendable: add "blake2b" or "sha512" if required
+# shellcheck disable=SC2034  # referenced externally
 HASH_ALGOS=("sha256" "sha1" "md5")
 
 # File size threshold (bytes) for hash computation (0 = no limit)
@@ -68,6 +68,7 @@ HASH_ALGOS=("sha256" "sha1" "md5")
 # ===============================
 
 # Report formats to generate (txt, csv, json, html if supported)
+# shellcheck disable=SC2034  # referenced externally
 REPORT_FORMATS=("txt" "csv" "json")
 
 # Log level: INFO | DEBUG | WARN | ERROR
