@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------
+# diag.sh - unified diagnostics entry point
+# ---------------------------------------------------
 set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
@@ -17,14 +20,19 @@ USAGE
 
 [[ $# -lt 1 ]] && { usage; exit 64; }
 SUBCMD="$1"; shift
-DEVICE=""; PKG="com.zhiliaoapp.musically"; LIMIT=5; PULL=0; LOG_LEVEL="${LOG_LEVEL:-INFO}"
+DEVICE=""
+PKG="com.zhiliaoapp.musically"
+LIMIT=5
+PULL=0
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --device) DEVICE="${2:-}"; shift 2;;
-    --pkg) PKG="${2:-}"; shift 2;;
-    --limit) LIMIT="${2:-}"; shift 2;;
-    --pull) PULL=1; shift;;
-    --debug) LOG_LEVEL=DEBUG; shift;;
+    --pkg)    PKG="${2:-}"; shift 2;;
+    --limit)  LIMIT="${2:-}"; shift 2;;
+    --pull)   PULL=1; shift;;
+    --debug)  LOG_LEVEL=DEBUG; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage; exit 64;;
   esac
@@ -65,7 +73,8 @@ cmd_health() {
 }
 
 cmd_paths() {
-  local ts=$(date +%Y%m%d_%H%M%S)
+  local ts
+  ts=$(date +%Y%m%d_%H%M%S)
   local base="paths_diag_${ts}_$(echo "$PKG" | tr '.' '_')"
   local out="$LOG_DIR/${base}.out"
   local err="$LOG_DIR/${base}.err"
@@ -106,7 +115,8 @@ cmd_paths() {
 }
 
 cmd_pull() {
-  local ts=$(date +%Y%m%d_%H%M%S)
+  local ts
+  ts=$(date +%Y%m%d_%H%M%S)
   local base="pull_diag_${ts}_$(echo "$PKG" | tr '.' '_')"
   local out="$LOG_DIR/${base}.out"
   local err="$LOG_DIR/${base}.err"
@@ -138,7 +148,8 @@ cmd_pull() {
 
 cmd_peek() {
   local pkg_esc="${PKG//./_}"
-  local sum=$(ls -1t "$LOG_DIR"/pull_diag_*_${pkg_esc}.summary.txt 2>/dev/null | head -n1)
+  local sum
+  sum=$(ls -1t "$LOG_DIR"/pull_diag_*_${pkg_esc}.summary.txt 2>/dev/null | head -n1 || true)
   if [[ -z "$sum" ]]; then
     echo "No pull diag found for $PKG"; return 0
   fi
@@ -146,8 +157,8 @@ cmd_peek() {
   echo "OUT=${prefix}.out"
   echo "ERR=${prefix}.err"
   echo "SUMMARY=$sum"
-  [[ -f ${prefix}.err ]] && { echo "--- ERR (first 40) ---"; sed -n '1,40p' ${prefix}.err; }
-  [[ -f ${prefix}.out ]] && { echo "--- OUT (first 40) ---"; sed -n '1,40p' ${prefix}.out; echo "--- OUT endings ---"; sed -n 'l' ${prefix}.out | sed -n '1,40p'; }
+  [[ -f ${prefix}.err ]] && { echo "--- ERR (first 40) ---"; sed -n '1,40p' "${prefix}.err"; }
+  [[ -f ${prefix}.out ]] && { echo "--- OUT (first 40) ---"; sed -n '1,40p' "${prefix}.out"; echo "--- OUT endings ---"; sed -n 'l' "${prefix}.out" | sed -n '1,40p'; }
   [[ -f $sum ]] && { echo "--- SUMMARY (first 40) ---"; sed -n '1,40p' "$sum"; }
 }
 
@@ -161,9 +172,9 @@ cmd_all() {
 
 case "$SUBCMD" in
   health) cmd_health ;;
-  paths) cmd_paths ;;
-  pull) cmd_pull ;;
-  peek) cmd_peek ;;
-  all) cmd_all ;;
+  paths)  cmd_paths ;;
+  pull)   cmd_pull ;;
+  peek)   cmd_peek ;;
+  all)    cmd_all ;;
   *) usage; exit 64 ;;
- esac
+esac

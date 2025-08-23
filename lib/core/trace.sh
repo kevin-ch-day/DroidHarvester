@@ -6,6 +6,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # trace.sh - tracing helpers
 # ---------------------------------------------------
 
+# Parse wrapper arguments into a label and command array
 parse_wrapper_args() {
     local _label_var="$1" _cmd_var="$2"; shift 2
     [[ $# -ge 1 ]] || return 127
@@ -24,12 +25,14 @@ with_trace() {
     if ! parse_wrapper_args label cmd "$@"; then
         return 127
     fi
+
     local start end dur rc
     start=$(date +%s%3N)
     "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
     rc=${PIPESTATUS[0]}
     end=$(date +%s%3N)
     dur=$((end-start))
+
     LOG_COMP="$label" LOG_DUR_MS="$dur" LOG_RC="$rc" log DEBUG "cmd: ${cmd[*]}"
     return "$rc"
 }
@@ -41,6 +44,7 @@ with_timeout() {
     if ! parse_wrapper_args label cmd "$@"; then
         return 127
     fi
+
     with_trace "$label" -- timeout --preserve-status -- "$secs" "${cmd[@]}"
     local rc=$?
     if [[ $rc -eq 124 || $rc -eq 137 || $rc -eq 143 ]]; then
