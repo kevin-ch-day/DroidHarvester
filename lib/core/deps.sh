@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-check_dependencies() {
-    local missing=()
-    for cmd in adb jq sha256sum md5sum sha1sum zip column; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            missing+=("$cmd")
-        fi
+# require <bin> -> die if missing with Fedora hint
+require() {
+    local bin="$1"
+    local pkg="$bin"
+    case "$bin" in
+        adb) pkg="android-tools";;
+    esac
+    command -v "$bin" >/dev/null 2>&1 || die "$E_DEPS" "Missing dependency: $bin (Fedora: sudo dnf install -y $pkg)"
+}
+
+# require_all <bins...>
+require_all() {
+    local b
+    for b in "$@"; do
+        require "$b"
     done
-    if (( ${#missing[@]} )); then
-        for cmd in "${missing[@]}"; do
-            echo "Missing dependency: $cmd - install via 'sudo dnf install -y $cmd'" >&2
-        done
-        exit 1
-    fi
+}
+
+# Backwards compatibility
+check_dependencies() {
+    require_all adb jq sha256sum md5sum sha1sum zip column
 }
