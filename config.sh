@@ -95,6 +95,30 @@ REPORT_FORMATS=("txt" "csv" "json")
 # Allow multiple devices (true/false)
 : "${ALLOW_MULTI_DEVICE:=false}"
 
+# Wrapper defaults (override via environment)
+: "${DH_SHELL_TIMEOUT:=15}"
+: "${DH_PULL_TIMEOUT:=60}"
+: "${DH_RETRIES:=3}"
+: "${DH_BACKOFF:=1}"
+
+validate_config() {
+    local var val
+    for var in DH_SHELL_TIMEOUT DH_PULL_TIMEOUT DH_RETRIES DH_BACKOFF; do
+        val="${!var}"
+        if ! [[ "$val" =~ ^[0-9]+$ ]] || (( val <= 0 )); then
+            LOG_COMP="config" log WARN "$var invalid ($val); using default"
+            case $var in
+                DH_SHELL_TIMEOUT) val=15 ;;
+                DH_PULL_TIMEOUT) val=60 ;;
+                DH_RETRIES) val=3 ;;
+                DH_BACKOFF) val=1 ;;
+            esac
+            eval "$var=$val"
+        fi
+        export "$var"
+    done
+}
+
 
 # Wrapper defaults
 : "${DH_SHELL_TIMEOUT:=15}"

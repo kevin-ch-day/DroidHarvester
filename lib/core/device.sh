@@ -6,6 +6,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # device.sh - ADB helpers with retry/backoff
 # ---------------------------------------------------
 
+# Default retry/backoff values (override with env if needed)
 : "${DH_RETRIES:=3}"
 : "${DH_BACKOFF:=1}"
 : "${DH_PULL_TIMEOUT:=60}"
@@ -18,22 +19,23 @@ adb_healthcheck() {
     LOG_COMP="host" log INFO "host df" && df -h . || true
 }
 
+# Wrapper with retries and exponential backoff
 adb_retry() {
     local max=${1:-$DH_RETRIES}; shift
     local backoff=${1:-$DH_BACKOFF}; shift
     split_label_cmd "$@" || return 127
+
     local attempt=0 rc=0 start end dur
     start=$(date +%s%3N)
     while (( attempt < max )); do
-        with_trace "$WRAP_LABEL" -- adb -s "$DEVICE" "${WRAP_CMD[@]}"
+        with_trace "$WRAP_LABEL" -- adb -s "$DEVICE" "${WRAP_CMD[@]}" && return 0
         rc=$?
-        [[ $rc -eq 0 ]] && break
         attempt=$((attempt+1))
         (( attempt < max )) && sleep "$backoff"
     done
     end=$(date +%s%3N)
     dur=$((end-start))
-    LOG_COMP="$WRAP_LABEL" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt+1))" log DEBUG "adb_retry"
+    LOG_COMP="$WRAP_LABEL" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt))" log DEBUG "adb_retry"
     return "$rc"
 }
 

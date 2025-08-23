@@ -45,6 +45,7 @@ export LOG_LEVEL DH_DEBUG
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config.sh"
+validate_config
 
 # shellcheck disable=SC1090
 for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do

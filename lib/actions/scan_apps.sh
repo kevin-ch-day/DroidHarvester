@@ -11,8 +11,8 @@ scan_apps() {
     log INFO "Scanning for target apps..."
     local pkg_list
     if ! pkg_list="$(with_timeout "$DH_SHELL_TIMEOUT" pm_list -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" pm_list -- \
-            shell pm list packages)"; then
+        adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- \
+            adb -s "$DEVICE" shell pm list packages)"; then
         LOG_CODE="$E_PM_LIST" log ERROR "failed to list packages"
         return
     fi
