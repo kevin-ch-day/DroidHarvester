@@ -5,46 +5,116 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # harvest.sh - harvest APKs and metadata
 # ---------------------------------------------------
+# Public entrypoint: harvest
+# Helpers:
+#   _harvest_prepare
+#   _harvest_one_pkg <pkg>
+#   _pull_one_path <pkg> <path>
+# ---------------------------------------------------
 
-harvest() {
-    [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
-    local all_pkgs=("${TARGET_PACKAGES[@]}" "${CUSTOM_PACKAGES[@]}")
-    if [[ ${#all_pkgs[@]} -eq 0 ]]; then
+# Prepare run; ensure device and targets exist; reset counters.
+_harvest_prepare() {
+    if [[ -z "${DEVICE:-}" ]]; then
+        log WARN "Choose a device first."
+        return 1
+    fi
+    # Build the working target list
+    ALL_PKGS=( "${TARGET_PACKAGES[@]}" )
+    if [[ -n "${CUSTOM_PACKAGES[*]:-}" ]]; then
+        ALL_PKGS+=( "${CUSTOM_PACKAGES[@]}" )
+    fi
+    if [[ ${#ALL_PKGS[@]} -eq 0 ]]; then
         log WARN "No packages selected."
-        return
+        return 1
     fi
 
+    # Reset session counters
     PKGS_FOUND=0
     PKGS_PULLED=0
+    return 0
+}
 
-    local pkg apk_paths path outfile pulled
-    for pkg in "${all_pkgs[@]}"; do
-        LOG_PKG="$pkg" log INFO "Checking $pkg..."
-        apk_paths="$(get_apk_paths "$pkg" || true)"
-        if [[ -z "$apk_paths" ]]; then
-            LOG_PKG="$pkg" log WARN "Not installed or no paths"
-            continue
+# Process one package: enumerate paths, pull, and record metadata.
+_harvest_one_pkg() {
+    local pkg="$1"
+    LOG_PKG="$pkg" log INFO "Checking ${pkg}..."
+
+    # Query APK paths (base + splits). Do not abort on empty.
+    local apk_paths
+    apk_paths="$(get_apk_paths "$pkg" || true)"
+    if [[ -z "$apk_paths" ]]; then
+        LOG_PKG="$pkg" log WARN "Not installed or no paths"
+        return 0
+    fi
+
+    # Split into an array safely.
+    local -a paths_array=()
+    mapfile -t paths_array <<<"$apk_paths"
+
+    local splits="${#paths_array[@]}"
+    LOG_PKG="$pkg" log DEBUG "splits=${splits}"
+
+    # Avoid set -e trap on post-increment. Use pre-increment.
+    (( ++PKGS_FOUND ))
+
+    local pulled_any=0
+    local path
+    for path in "${paths_array[@]}"; do
+        [[ -z "$path" ]] && continue
+        LOG_PKG="$pkg" log INFO "Found APK: ${path}"
+        if _pull_one_path "$pkg" "$path"; then
+            pulled_any=1
         fi
-        local splits
-        splits=$(printf '%s\n' "$apk_paths" | sed '/^$/d' | wc -l)
-        LOG_PKG="$pkg" log DEBUG "splits=$splits"
-        ((PKGS_FOUND++))
-        pulled=0
-        while IFS= read -r path; do
-            outfile=$(pull_apk "$pkg" "$path")
-            rc=$?
-            if (( rc != 0 )); then
-                continue
-            fi
-            if [[ -n "$outfile" ]]; then
-                pulled=1
-                apk_metadata "$pkg" "$outfile"
-            fi
-        done <<< "$apk_paths"
-        ((pulled)) && ((PKGS_PULLED++))
-        LOG_PKG="$pkg" log DEBUG "package_complete pulled=$pulled splits=$splits"
     done
 
+    if (( pulled_any )); then
+        (( ++PKGS_PULLED ))
+    fi
+    LOG_PKG="$pkg" log DEBUG "package_complete pulled=${pulled_any} splits=${splits}"
+    return 0
+}
+
+# Pull a single APK path and append metadata.
+# Returns 0 if the pull+metadata succeeded for this path, 1 otherwise.
+_pull_one_path() {
+    local pkg="$1"
+    local path="$2"
+
+    # Pull to local filesystem
+    local outfile
+    outfile="$(pull_apk "$pkg" "$path")"
+    local rc=$?
+    if (( rc != 0 )); then
+        LOG_PKG="$pkg" log WARN "pull_failed rc=${rc} path=${path}"
+        return 1
+    fi
+    if [[ -z "$outfile" ]]; then
+        LOG_PKG="$pkg" log WARN "pull_returned_empty path=${path}"
+        return 1
+    fi
+
+    # Record metadata for this artifact
+    apk_metadata "$pkg" "$outfile" || {
+        LOG_PKG="$pkg" log WARN "metadata_failed file=${outfile}"
+        return 1
+    }
+    return 0
+}
+
+# Public entrypoint. Orchestrates the run.
+harvest() {
+    # Prepare targets and counters
+    if ! _harvest_prepare; then
+        return 0   # keep interactive flow; message already logged
+    fi
+
+    # Iterate packages
+    local pkg
+    for pkg in "${ALL_PKGS[@]}"; do
+        _harvest_one_pkg "$pkg"
+    done
+
+    # Finalize and advertise output locations
     finalize_report "all"
     LAST_TXT_REPORT="$TXT_REPORT"
     log SUCCESS "Harvest complete. Reports written to $RESULTS_DIR"
