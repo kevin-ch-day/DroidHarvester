@@ -31,14 +31,6 @@ three sidecar reports:
 
 ### Quick diagnostics
 
-When triaging a failing harvest run these probes:
-
-```bash
-adb get-state
-adb -s "$DEVICE" shell echo OK
-adb -s "$DEVICE" shell pm path com.example.app | wc -l
-```
-
 Enable command tracing to file:
 
 ```bash
@@ -46,19 +38,40 @@ ts=$(date +%Y%m%d_%H%M%S)
 LOG_LEVEL=DEBUG ./run.sh --debug 9>"logs/trace_$ts.log"
 ```
 
-## Utilities
+## Diagnostics
 
-Diagnostics and maintenance scripts live under `scripts/` and are run from that directory:
+Run diagnostic probes from `scripts/`:
 
 ```bash
 cd scripts
-./diag_adb_health.sh --debug
-./test_get_apk_paths.sh --pkg <package> --debug
+./diag.sh health
+./diag.sh paths --pkg com.zhiliaoapp.musically
+./diag.sh pull  --pkg com.zhiliaoapp.musically --limit 3
+./diag.sh peek
+./diag.sh all  --limit 3
+```
+
+All diagnostics write logs to the repository’s `logs/` directory.
+
+## Developer checks
+
+Developer-focused static and wrapper tests:
+
+```bash
+cd scripts
+./dev_static_check.sh
+./dev_wrapper_selftest.sh
+```
+
+## Utilities
+
+Miscellaneous helpers live under `scripts/`:
+
+```bash
+cd scripts
 ./github-helper.sh --debug
 ./make_executable.sh --debug
 ```
-
-Each utility writes a timestamped transcript to the repository’s `logs/` folder.
 
 ### Fedora packages
 
@@ -79,7 +92,7 @@ sudo dnf install -y shellcheck
 
 ### Environment overrides
 
-- `DH_PULL_TIMEOUT` (default 120)
-- `DH_SHELL_TIMEOUT` (default 20)
+- `DH_PULL_TIMEOUT` (default 60)
+- `DH_SHELL_TIMEOUT` (default 15)
 - `DH_RETRIES` (default 3)
-- `DH_BACKOFF` (default 1.5)
+- `DH_BACKOFF` (default 1)
