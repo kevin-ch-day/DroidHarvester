@@ -16,6 +16,9 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 #   - Custom packages may be provided via external file.
 # ---------------------------------------------------
 
+# Determine repository root if caller has not set SCRIPT_DIR
+: "${SCRIPT_DIR:="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}"
+
 # ===============================
 # I. OUTPUT DIRECTORIES
 # ===============================

@@ -1,21 +1,33 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------
-# test_get_apk_paths.sh - zero-arg, hardcoded test
+# test_get_apk_paths.sh - targeted diagnostic for get_apk_paths()
+# Usage: ./scripts/test_get_apk_paths.sh [--debug] [--device SERIAL] [--package PKG]
 # Plain ASCII. Fedora/Linux. No menu, no side effects.
 # ---------------------------------------------------
 set -euo pipefail
-set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
+# No ERR trap; rely on explicit error messages
 
-# ======= HARD-CODED SETTINGS (edit as needed) =================
-HARD_DEVICE_ID="ZY22JK89DR"
-HARD_PACKAGES=(
-  "com.zhiliaoapp.musically"
-  # "com.twitter.android"
-  # "com.instagram.android"
-)
+# ---- Exit codes ----
+E_USAGE=64; E_DEPS=2; E_NO_DEVICE=10; E_MULTI_DEVICE=11; E_NOT_FOUND=12
+
+# ---- Argument parsing ----
+usage() {
+  echo "Usage: $0 [--debug] [--device SERIAL] [--package PKG]" >&2
+}
+
+DEVICE_OVERRIDE=""
+PACKAGES=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --debug)   LOG_LEVEL="DEBUG"; shift ;;
+    --device)  DEVICE_OVERRIDE="$2"; shift 2 ;;
+    --package) PACKAGES+=("$2"); shift 2 ;;
+    -h|--help) usage; exit $E_USAGE ;;
+    *)         usage; exit $E_USAGE ;;
+  esac
+done
+
 SAMPLE_LIMIT=5
-# =============================================================
 
 # Repo root (script lives in scripts/)
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,46 +38,63 @@ mkdir -p "$LOG_DIR"
 TS="$(date +%Y%m%d_%H%M%S)"
 
 # --- Minimal local requires (avoid relying on non-existent helpers) ---
-require() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not found."; exit 2; }; }
+require() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not found." >&2; exit $E_DEPS; }; }
 require adb; require awk; require sed; require grep; require nl; require tee; require wc; require tr; require sort; require comm
 
 # --- Load project config/libs (for get_apk_paths & logging) ---
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config.sh"
+trap - ERR
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/logging.sh"   || true
+trap - ERR
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/io/apk_utils.sh"   || true
+trap - ERR
 
 : "${LOG_LEVEL:=INFO}"
 export LOG_LEVEL
 
-# --- Helper: pick the device (use hardcoded, else auto-pick single) ---
+# Default package list: first TARGET_PACKAGES entry if none supplied
+if (( ${#PACKAGES[@]} == 0 )); then
+  PACKAGES=("${TARGET_PACKAGES[0]}")
+fi
+
+# --- Helper: pick the device (auto-pick single or use override) ---
 pick_device_or_fail() {
-  local id="$HARD_DEVICE_ID"
+  local id="$DEVICE_OVERRIDE"
   if [[ -n "$id" ]]; then
-    echo "$id"
-    return 0
+    if adb devices | awk 'NR>1 && $2=="device"{print $1}' | grep -qx "$id"; then
+      echo "$id"
+      return 0
+    else
+      echo "ERROR: device $id not detected via 'adb devices'." >&2
+      return $E_NOT_FOUND
+    fi
   fi
-  # Fallback: single attached device
   mapfile -t devs < <(adb devices | awk 'NR>1 && $2=="device"{print $1}')
   if (( ${#devs[@]} == 0 )); then
     echo "ERROR: no devices detected via 'adb devices'." >&2
-    exit 10
+    return $E_NO_DEVICE
   elif (( ${#devs[@]} > 1 )); then
-    echo "ERROR: multiple devices detected. Set HARD_DEVICE_ID in this script." >&2
+    echo "ERROR: multiple devices detected. Specify --device." >&2
     printf 'Detected:\n' >&2
     printf '  %s\n' "${devs[@]}" >&2
-    exit 11
+    return $E_MULTI_DEVICE
   fi
   echo "${devs[0]}"
 }
-
+set +e
 DEVICE="$(pick_device_or_fail)"
+rc=$?
+set -e
+if (( rc != 0 )); then
+  exit $rc
+fi
 
 # --- Banner ---
 echo "Device   : $DEVICE"
-echo "Packages : ${#HARD_PACKAGES[@]} (edit HARD_PACKAGES[] in this script)"
+echo "Packages : ${#PACKAGES[@]} (${PACKAGES[*]})"
 echo "Limit    : $SAMPLE_LIMIT"
 echo "Logs dir : $LOG_DIR"
 echo "--------------------------------------------------"
@@ -78,7 +107,7 @@ echo "--------------------------------------------------"
 overall_fail=0
 
 # --- Per-package test loop ---
-for PKG in "${HARD_PACKAGES[@]}"; do
+for PKG in "${PACKAGES[@]}"; do
   BASE="paths_diag_${TS}_$(echo "$PKG" | tr '.' '_' )"
   STDOUT_FILE="$LOG_DIR/${BASE}.out"
   STDERR_FILE="$LOG_DIR/${BASE}.err"
