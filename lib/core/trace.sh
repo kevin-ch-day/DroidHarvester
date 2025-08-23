@@ -6,11 +6,11 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # trace.sh - tracing helpers
 # ---------------------------------------------------
 
-# Parse wrapper arguments into a label and command array
+## Parse wrapper arguments into a label and command array
 parse_wrapper_args() {
-    local _label_var="$1" _cmd_var="$2"; shift 2
+    local _label_var="${1:-}" _cmd_var="${2:-}"; shift 2 || true
     [[ $# -ge 1 ]] || return 127
-    local label="$1"; shift
+    local label="${1:-}"; shift
     [[ "${1:-}" == "--" ]] || return 127
     shift
     [[ $# -gt 0 ]] || return 127
@@ -19,38 +19,52 @@ parse_wrapper_args() {
     return 0
 }
 
-with_trace() {
-    local label
+trace() {
+    local label=""
     local -a cmd
     if ! parse_wrapper_args label cmd "$@"; then
         return 127
     fi
-
+    : "${label:=}"
     local start end dur rc
     start=$(date +%s%3N)
     "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
     rc=${PIPESTATUS[0]}
     end=$(date +%s%3N)
     dur=$((end-start))
-
     LOG_COMP="$label" LOG_DUR_MS="$dur" LOG_RC="$rc" log DEBUG "cmd: ${cmd[*]}"
     return "$rc"
 }
 
+# Backwards compat alias
+with_trace() { trace "$@"; }
+
 with_timeout() {
     local secs="$1"; shift
-    local label
+    local label=""
     local -a cmd
     if ! parse_wrapper_args label cmd "$@"; then
         return 127
     fi
-
-    with_trace "$label" -- timeout --preserve-status -- "$secs" "${cmd[@]}"
+    : "${label:=}"
+    trace "$label" -- timeout --preserve-status -- "$secs" "${cmd[@]}"
     local rc=$?
     if [[ $rc -eq 124 || $rc -eq 137 || $rc -eq 143 ]]; then
         LOG_COMP="$label" LOG_CODE="$E_TIMEOUT" LOG_RC="$rc" log ERROR "timeout after ${secs}s: ${cmd[*]}"
     fi
     return $rc
+}
+
+trace_enter() {
+    local label="${1:-}"
+    : "${label:=}"
+    LOG_COMP="$label" log DEBUG "enter"
+}
+
+trace_leave() {
+    local label="${1:-}"
+    : "${label:=}"
+    LOG_COMP="$label" log DEBUG "leave"
 }
 
 enable_xtrace_to_file() {

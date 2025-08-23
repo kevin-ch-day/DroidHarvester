@@ -6,9 +6,13 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # choose_device.sh - device selection action
 # ---------------------------------------------------
 
+# shellcheck disable=SC1090
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/core/trace.sh"
+
 choose_device() {
+    trace_enter "choose_device"
     local devices
-    devices=$(with_trace adb_list -- adb devices | awk 'NR>1 && $2=="device" {print $1}')
+    devices=$(trace adb_list -- adb devices | awk 'NR>1 && $2=="device" {print $1}')
     if [[ -z "$devices" ]]; then
         LOG_CODE="$E_NO_DEVICE" log ERROR "no devices detected"
         return
@@ -43,4 +47,5 @@ choose_device() {
         log INFO "Device profile saved: $DEVICE_DIR/device_profile.txt"
     fi
     unset LOG_DEV
+    trace_leave "choose_device"
 }

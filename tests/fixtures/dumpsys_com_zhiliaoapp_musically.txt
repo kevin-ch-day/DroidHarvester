@@ -1,0 +1,4 @@
+Package [com.zhiliaoapp.musically] (installer=null):
+    versionName=31.1.0
+    versionCode=2103100000 minSdk=23 targetSdk=33
+    installerPackageName=com.android.vending

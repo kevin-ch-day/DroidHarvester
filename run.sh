@@ -9,38 +9,27 @@ set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
+(( $# == 0 )) || { echo "This tool is menu-driven; run ./run.sh with no arguments." >&2; exit 64; }
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
 LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
-DEVICE=""
-LOG_LEVEL="INFO"
-DH_DEBUG=0
+LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
+find "$LOG_DIR" -type f -mtime +"$LOG_RETENTION_DAYS" -print -delete 2>/dev/null || true
 
-# Load error/logging helpers early so option parsing can use them
+DEVICE=""
+LOG_LEVEL=${LOG_LEVEL:-INFO}
+DH_DEBUG=${DH_DEBUG:-0}
+
+# Load error/logging helpers early
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/errors.sh"
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/logging.sh"
 
-usage() {
-    cat <<USAGE
-Usage: $0 [--device ID] [--debug] [-h|--help]
-
---debug  increase log verbosity; transcript saved to logs/harvest_log_<ts>.txt
-USAGE
-}
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --device) DEVICE="${2:-}"; shift 2;;
-        --debug) LOG_LEVEL="DEBUG"; DH_DEBUG=1; shift;;
-        -h|--help) usage; exit 0;;
-        *) die "$E_USAGE" "Unknown option: $1";;
-    esac
-done
 export LOG_LEVEL DH_DEBUG
 
 # shellcheck disable=SC1090
