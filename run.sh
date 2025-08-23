@@ -48,7 +48,7 @@ source "$REPO_ROOT/config.sh"
 validate_config
 
 # shellcheck disable=SC1090
-for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do
+for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest; do
     source "$REPO_ROOT/lib/$lib.sh"
 done
 # shellcheck disable=SC1090

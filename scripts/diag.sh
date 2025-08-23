@@ -46,7 +46,7 @@ LOG_DIR="$REPO_ROOT/logs"; mkdir -p "$LOG_DIR"
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config.sh"
 # shellcheck disable=SC1090
-for m in core/logging core/errors core/deps core/device core/trace io/apk_utils io/report; do
+for m in core/logging core/errors core/deps core/device core/trace io/report; do
   source "$REPO_ROOT/lib/$m.sh"
 done
 validate_config
@@ -80,7 +80,7 @@ cmd_paths() {
   local err="$LOG_DIR/${base}.err"
   local sum="$LOG_DIR/${base}.summary.txt"
   set +e
-  get_apk_paths "$PKG" >"$out" 2>"$err"
+  DEVICE="$DEVICE" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/generate_apk_list.sh" "$PKG" >"$out" 2>"$err"
   local rc=$?
   set -e
   {
@@ -122,7 +122,7 @@ cmd_pull() {
   local err="$LOG_DIR/${base}.err"
   local sum="$LOG_DIR/${base}.summary.txt"
   set +e
-  get_apk_paths "$PKG" >"$out" 2>"$err"
+  DEVICE="$DEVICE" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/generate_apk_list.sh" "$PKG" >"$out" 2>"$err"
   set -e
   local stage="$REPO_ROOT/results/$DEVICE/debug_pull_${ts}"
   mkdir -p "$stage"
