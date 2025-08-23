@@ -2,8 +2,7 @@
 # ---------------------------------------------------
 # run.sh - DroidHarvester Interactive APK Harvester
 # ---------------------------------------------------
-# Main operator console for harvesting APKs, extracting
-# metadata, and generating IEEE-style analyst reports.
+# Entry point: manages menu loop and dispatches actions.
 # ---------------------------------------------------
 
 set -euo pipefail
@@ -11,232 +10,34 @@ set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+export SCRIPT_DIR
 
 LOG_LEVEL="INFO"
+DH_DEBUG=0
 if [[ "${1:-}" == "--debug" ]]; then
     LOG_LEVEL="DEBUG"
+    DH_DEBUG=1
 fi
-export LOG_LEVEL
+export LOG_LEVEL DH_DEBUG
 
-# ---------------------------------------------------
-# Load config + libs
-# ---------------------------------------------------
 source "$SCRIPT_DIR/config.sh"
-for lib in deps logging device apk_utils metadata report menu_util; do
-    # shellcheck disable=SC1090
+
+# shellcheck disable=SC1090
+for lib in core/errors core/logging core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do
     source "$SCRIPT_DIR/lib/$lib.sh"
 done
+# shellcheck disable=SC1090
+for action in choose_device scan_apps add_custom_package harvest list_apps search_apps view_report export_bundle resume cleanup; do
+    source "$SCRIPT_DIR/lib/actions/$action.sh"
+done
 
-# ---------------------------------------------------
-# Globals
-# ---------------------------------------------------
-RESULTS_DIR="$SCRIPT_DIR/results"
-LOGS_DIR="$SCRIPT_DIR/logs"
-mkdir -p "$RESULTS_DIR" "$LOGS_DIR"
-
-LOGFILE="$LOGS_DIR/harvest_log_$TIMESTAMP.txt"
-REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.csv"
-JSON_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.json"
-TXT_REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.txt"
-
-trap cleanup_reports EXIT
-
-DEVICE=""
-CUSTOM_PACKAGES_FILE="$SCRIPT_DIR/custom_packages.txt"
-CUSTOM_PACKAGES=()
-[[ -f "$CUSTOM_PACKAGES_FILE" ]] && mapfile -t CUSTOM_PACKAGES < "$CUSTOM_PACKAGES_FILE"
-
-PKGS_FOUND=0
-PKGS_PULLED=0
-LAST_TXT_REPORT=""
-DEVICE_FINGERPRINT=""
-SESSION_ID="$TIMESTAMP"
-export DEVICE_FINGERPRINT SESSION_ID
-
-session_metadata() {
-    {
-        echo "=================================================="
-        echo " DroidHarvester Session Metadata"
-        echo " Host       : $(hostname)"
-        echo " User       : $(whoami)"
-        echo " Date       : $(date)"
-        echo " OS         : $(uname -srvmo)"
-        echo "=================================================="
-    } >> "$LOGFILE"
-    log INFO "Session initialized (log: $LOGFILE)"
-}
-
-# ---------------------------------------------------
-# Menu functions
-# ---------------------------------------------------
-
-scan_apps() {
-    [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
-    log INFO "Scanning for target apps..."
-    local pkg_list
-    if ! pkg_list="$(adb_shell pm list packages)"; then
-        log ERROR "E_PM_LIST: failed to list packages"
-        return
-    fi
-    for pkg in "${TARGET_PACKAGES[@]}"; do
-        if grep -Fq -- "$pkg" <<< "$pkg_list"; then
-            log SUCCESS "Found: $pkg"
-        else
-            log WARN "Not installed: $pkg"
-        fi
-    done
-}
-
-add_custom_package() {
-    read -rp "Enter package name (e.g., com.example.app): " pkg
-    if [[ -n "$pkg" ]]; then
-        CUSTOM_PACKAGES+=("$pkg")
-        echo "$pkg" >> "$CUSTOM_PACKAGES_FILE"
-        log SUCCESS "Added custom package: $pkg"
-    else
-        log WARN "No package entered."
-    fi
-}
-
-harvest() {
-    [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
-    local all_pkgs=("${TARGET_PACKAGES[@]}" "${CUSTOM_PACKAGES[@]}")
-    if [[ ${#all_pkgs[@]} -eq 0 ]]; then
-        log WARN "No packages selected."
-        return
-    fi
-
-    PKGS_FOUND=0
-    PKGS_PULLED=0
-
-    local pkg apk_paths path outfile pulled
-    for pkg in "${all_pkgs[@]}"; do
-        log INFO "Checking $pkg..."
-
-        if ! apk_paths="$(get_apk_paths "$pkg")"; then
-            log WARN "Not installed or no paths: $pkg"
-            continue
-        fi
-        [[ -z "$apk_paths" ]] && { log WARN "No APK paths found: $pkg"; continue; }
-
-        ((PKGS_FOUND++))
-        pulled=0
-
-        # Iterate each path safely
-        while IFS= read -r path; do
-            [[ -z "$path" ]] && continue
-            log INFO "Found APK: $path"
-
-            # Do not let set -e kill the session on a single failure
-            if ! outfile="$(pull_apk "$pkg" "$path")"; then
-                log ERROR "E_PULL_FAIL: $pkg -> $path"
-                continue
-            fi
-
-            if [[ -n "$outfile" ]]; then
-                pulled=1
-                apk_metadata "$pkg" "$outfile"
-            fi
-        done <<< "$apk_paths"
-
-        ((pulled)) && ((PKGS_PULLED++))
-    done
-
-    finalize_report "all"
-    LAST_TXT_REPORT="$TXT_REPORT"
-    log SUCCESS "Harvest complete. Reports written to $RESULTS_DIR"
-}
-
-list_installed_apps() {
-    [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
-    log INFO "Listing installed apps..."
-    adb_shell pm list packages | sed 's/package://g' | sort
-}
-
-search_installed_apps() {
-    [[ -z "$DEVICE" ]] && { log WARN "Choose a device first."; return; }
-    read -rp "Enter search keyword: " keyword
-    if [[ -z "$keyword" ]]; then
-        log WARN "No keyword entered."
-        return
-    fi
-    log INFO "Searching for '$keyword'..."
-    local results
-    results=$(adb_shell pm list packages | grep -Fi -- "$keyword" | sed 's/package://g' || true)
-    if [[ -n "$results" ]]; then
-        echo "$results"
-    else
-        log WARN "No packages match '$keyword'"
-    fi
-}
-
-view_report() {
-    local latest
-    latest=$(latest_report)
-    if [[ -z "$latest" ]]; then
-        log WARN "No reports found."
-    else
-        LAST_TXT_REPORT="$latest"
-        echo
-        echo "--------------------------------------------------"
-        echo " Last Report (Preview)"
-        echo "--------------------------------------------------"
-        head -n 40 "$latest"
-        echo "--------------------------------------------------"
-        log INFO "Full report: $latest"
-    fi
-}
-
-cleanup_partial_run() {
-    if [[ -z "${DEVICE_DIR:-}" || ! -d "$DEVICE_DIR" ]]; then
-        log WARN "No device directory to clean."
-        return
-    fi
-    read -rp "Remove $DEVICE_DIR? [y/N]: " ans
-    case "$ans" in
-        [Yy]*) rm -rf "$DEVICE_DIR"; log SUCCESS "Removed $DEVICE_DIR"; DEVICE="" ;;
-        *)     log WARN "Cleanup cancelled." ;;
-    esac
-}
-
-resume_last_session() {
-    local last_dev
-    last_dev=$(find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 -type d -print0 \
-        | xargs -0 stat --printf '%Y\t%n\0' 2>/dev/null \
-        | sort -z -nr \
-        | head -z -n1 \
-        | cut -f2- \
-        | tr -d '\0')
-    if [[ -z "$last_dev" ]]; then
-        log WARN "No previous session found."
-        return
-    fi
-    DEVICE=$(basename "$last_dev")
-    DEVICE_DIR="$last_dev"
-    init_report
-    log SUCCESS "Resumed device: $DEVICE"
-}
-
-export_report() {
-    local zipfile="$RESULTS_DIR/apk_harvest_${TIMESTAMP}.zip"
-    local files=()
-    for f in "$REPORT" "$JSON_REPORT" "$TXT_REPORT" "$LOGFILE"; do
-        [[ -f "$f" ]] && files+=("$f")
-    done
-    if [[ ${#files[@]} -eq 0 ]]; then
-        log WARN "No reports to export. Run a harvest first."
-        return
-    fi
-    zip -j "$zipfile" "${files[@]}" >/dev/null
-    log SUCCESS "Exported report bundle: $zipfile"
-}
-
-# ---------------------------------------------------
-# Main
-# ---------------------------------------------------
 check_dependencies
+init_session
 session_metadata
+
+if [[ $DH_DEBUG -eq 1 ]]; then
+    enable_xtrace_to_file "$LOGS_DIR/trace_$TIMESTAMP.log"
+fi
 
 while true; do
     LAST_TXT_REPORT=$(latest_report)
@@ -274,9 +75,10 @@ while true; do
         8) export_report ;;
         9) resume_last_session ;;
         10) cleanup_partial_run ;;
-        11) log INFO "Exiting DroidHarvester."; exit 0 ;;
+        11) LOG_COMP="core" log INFO "Exiting DroidHarvester."; exit 0 ;;
     esac
 
     draw_menu_footer
     pause
+
 done
