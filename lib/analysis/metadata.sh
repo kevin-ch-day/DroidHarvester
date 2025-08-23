@@ -51,12 +51,15 @@ apk_metadata() {
         if [[ "$outfile" == *"/system/"* || "$outfile" == *"/product/"* || "$outfile" == *"/vendor/"* || "$outfile" == *"/apex/"* ]]; then
             installType="system"
         fi
+        local role="base"
+        [[ "$(basename "$outfile")" != "base.apk" ]] && role="split"
 
         # -----------------------------
         # Logging
         # -----------------------------
         log INFO "✅ Metadata for $pkg → $(basename "$outfile")"
         log INFO "      File        : $outfile"
+        log INFO "      Role        : $role"
         log INFO "      SHA256      : $sha256"
         log INFO "      SHA1        : $sha1"
         log INFO "      MD5         : $md5"
@@ -117,5 +120,48 @@ apk_metadata() {
           --arg findings "TBD" \
           '{package:$pkg,file:$file,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType,findings:$findings}' \
           >> "$JSON_REPORT.tmp"
+
+        # -----------------------------
+        # Per-APK sidecar reports
+        # -----------------------------
+        local pulled_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        local base_noext="${outfile%.apk}"
+        {
+            echo "Package: $pkg"
+            echo "APK: $(basename "$outfile")"
+            echo "Role: $role"
+            echo "SHA256: $sha256"
+            echo "SHA1: $sha1"
+            echo "MD5: $md5"
+            echo "Size: $size"
+            echo "Pulled: $pulled_at"
+        } > "${base_noext}.txt"
+
+        {
+            echo "package,apk,role,sha256,sha1,md5,size,pulled_at,install_type"
+            printf '%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+                "$(csv_escape "$pkg")" \
+                "$(csv_escape "$(basename "$outfile")")" \
+                "$(csv_escape "$role")" \
+                "$(csv_escape "$sha256")" \
+                "$(csv_escape "$sha1")" \
+                "$(csv_escape "$md5")" \
+                "$(csv_escape "$size")" \
+                "$(csv_escape "$pulled_at")" \
+                "$(csv_escape "$installType")"
+        } > "${base_noext}.csv"
+
+        jq -n \
+          --arg pkg "$pkg" \
+          --arg apk "$(basename "$outfile")" \
+          --arg role "$role" \
+          --arg sha256 "$sha256" \
+          --arg sha1 "$sha1" \
+          --arg md5 "$md5" \
+          --arg size "$size" \
+          --arg pulled "$pulled_at" \
+          --arg installType "$installType" \
+          '{package:$pkg,apk:$apk,role:$role,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,pulled_at:$pulled,install_type:$installType}' \
+          > "${base_noext}.json"
     fi
 }
