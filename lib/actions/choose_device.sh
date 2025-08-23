@@ -34,11 +34,13 @@ choose_device() {
     DEVICE_FINGERPRINT="$(adb_shell getprop ro.product.manufacturer | tr -d '\r') $(adb_shell getprop ro.product.model | tr -d '\r')"
     export DEVICE_FINGERPRINT
     init_report
-    LOG_DEV="$DEVICE" log SUCCESS "Using device: $DEVICE"
-    LOG_DEV="$DEVICE" log INFO "Output directory: $DEVICE_DIR"
+    LOG_DEV="$DEVICE"
+    log SUCCESS "Using device: $DEVICE"
+    log INFO "Output directory: $DEVICE_DIR"
 
     if [[ "${INCLUDE_DEVICE_PROFILE:-false}" == "true" ]]; then
         adb -s "$DEVICE" shell getprop | tee -a "$LOGFILE" > "$DEVICE_DIR/device_profile.txt"
-        LOG_DEV="$DEVICE" log INFO "Device profile saved: $DEVICE_DIR/device_profile.txt"
+        log INFO "Device profile saved: $DEVICE_DIR/device_profile.txt"
     fi
+    unset LOG_DEV
 }

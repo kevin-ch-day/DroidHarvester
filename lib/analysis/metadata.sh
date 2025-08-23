@@ -12,6 +12,7 @@ csv_escape() {
 apk_metadata() {
     local pkg="$1"
     local outfile="$2"
+    local device_path="${3:-}"
 
     if [[ -f "$outfile" ]]; then
         # Hashes & file info
@@ -37,18 +38,18 @@ apk_metadata() {
             local info
             info=$(adb_shell dumpsys package "$pkg" 2>/dev/null || true)
 
-            version=$(echo "$info" | grep versionName | head -n1 | awk -F= '{print $2}' | xargs)
-            versionCode=$(echo "$info" | grep versionCode | head -n1 | grep -o '[0-9]\+' | xargs)
-            targetSdk=$(echo "$info" | grep targetSdk | head -n1 | awk -F= '{print $2}' | xargs)
-            installer=$(echo "$info" | grep "installerPackageName" | awk -F= '{print $2}' | tr -d ' ' | xargs)
-            firstInstall=$(echo "$info" | grep firstInstallTime | awk -F= '{print $2}' | xargs)
-            lastUpdate=$(echo "$info" | grep lastUpdateTime | awk -F= '{print $2}' | xargs)
-            uid=$(echo "$info" | grep userId= | head -n1 | awk -F= '{print $2}' | xargs)
+            version=$(awk -F= '/versionName/{print $2;exit}' <<<"$info" | xargs || true)
+            versionCode=$(awk -F'[= ]' '/versionCode/{print $2;exit}' <<<"$info" | xargs || true)
+            targetSdk=$(awk -F= '/targetSdk/{print $2;exit}' <<<"$info" | xargs || true)
+            installer=$(awk -F= '/installerPackageName/{print $2;exit}' <<<"$info" | tr -d ' ' | xargs || true)
+            firstInstall=$(awk -F= '/firstInstallTime/{print $2;exit}' <<<"$info" | xargs || true)
+            lastUpdate=$(awk -F= '/lastUpdateTime/{print $2;exit}' <<<"$info" | xargs || true)
+            uid=$(awk -F= '/userId=/{print $2;exit}' <<<"$info" | xargs || true)
         fi
 
-        # Guess install type by path
+        # Guess install type by original device path
         local installType="user"
-        if [[ "$outfile" == *"/system/"* || "$outfile" == *"/product/"* || "$outfile" == *"/vendor/"* || "$outfile" == *"/apex/"* ]]; then
+        if [[ "$device_path" == /system/* || "$device_path" == /product/* || "$device_path" == /vendor/* || "$device_path" == /apex/* ]]; then
             installType="system"
         fi
         local role="base"
