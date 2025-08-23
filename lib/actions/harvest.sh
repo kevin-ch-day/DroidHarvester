@@ -41,7 +41,7 @@ _harvest_one_pkg() {
 
     # Query APK paths (base + splits). Do not abort on empty.
     local apk_paths
-    apk_paths="$(get_apk_paths "$pkg" || true)"
+    apk_paths="$(DEVICE="$DEVICE" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/generate_apk_list.sh" "$pkg" || true)"
     if [[ -z "$apk_paths" ]]; then
         LOG_PKG="$pkg" log WARN "Not installed or no paths"
         return 0
@@ -82,7 +82,7 @@ _pull_one_path() {
 
     # Pull to local filesystem
     local outfile
-    outfile="$(pull_apk "$pkg" "$path")"
+    outfile="$(DEVICE="$DEVICE" DEVICE_DIR="$DEVICE_DIR" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/pull_apk.sh" "$pkg" "$path")"
     local rc=$?
     if (( rc != 0 )); then
         LOG_PKG="$pkg" log WARN "pull_failed rc=${rc} path=${path}"
@@ -93,11 +93,12 @@ _pull_one_path() {
         return 1
     fi
 
-    # Record metadata for this artifact
-    apk_metadata "$pkg" "$outfile" "$path" || {
+    # Record metadata for this artifact via step script
+    if ! DEVICE="$DEVICE" LOGFILE="$LOGFILE" REPORT="$REPORT" JSON_REPORT="$JSON_REPORT" \
+        TXT_REPORT="$TXT_REPORT" bash "$REPO_ROOT/steps/generate_apk_metadata.sh" "$pkg" "$outfile" "$path"; then
         LOG_PKG="$pkg" log WARN "metadata_failed file=${outfile}"
         return 1
-    }
+    fi
     return 0
 }
 

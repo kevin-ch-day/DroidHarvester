@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------
-# lib/io/apk_utils.sh - APK discovery and pulling
+# lib/io/apk_utils.sh - helpers for APK operations
 # ---------------------------------------------------
 set -euo pipefail
 set -E
@@ -130,77 +130,4 @@ run_adb_pull_with_fallbacks() {
   return "$rc"
 }
 
-# --- Public: get_apk_paths ----------------------------------------------------
 
-get_apk_paths() {
-  ensure_timeouts_defaults
-  local pkg="$1"
-
-  # --- Shield ERR + -e while we call the fallbacks runner ---
-  local raw rc __old_err_trap
-  __old_err_trap="$(trap -p ERR || true)"
-  trap - ERR
-  set +e
-  raw="$(run_pm_path_with_fallbacks "$pkg")"
-  rc=$?
-  set -e
-  # Restore ERR trap (if any)
-  [[ -n "$__old_err_trap" ]] && eval "$__old_err_trap" || true
-
-  if (( rc != 0 )); then
-    # PM_PATH_TRIES_RC is set by run_pm_path_with_fallbacks (A:rc B:rc C:rc)
-    LOG_CODE="${E_PM_PATH:-21}" LOG_RC="$rc" LOG_PKG="$pkg" LOG_COMP="pm_path" \
-      log ERROR "pm path failed (attempts rc: ${PM_PATH_TRIES_RC:-unknown})"
-    return 0  # non-fatal for callers
-  fi
-
-  # Sanitize → stdout (absolute paths only)
-  local paths count
-  paths="$(printf '%s' "$raw" | sanitize_pm_output)"
-  count=$(printf '%s\n' "$paths" | sed '/^$/d' | wc -l || true)
-  LOG_COMP="pm_path" LOG_PKG="$pkg" log DEBUG "paths=$count"
-
-  [[ -z "$paths" ]] && { log WARN "No APK paths found for package $pkg"; return 0; }
-  printf '%s\n' "$paths"
-}
-
-
-# --- Public: pull_apk ---------------------------------------------------------
-
-pull_apk() {
-  ensure_timeouts_defaults
-
-  local pkg="$1" apk_path="$2"
-
-  # Calculate output locations
-  local outdir outfile role
-  IFS=$'\0' read -r outdir outfile role < <(compute_outfile_vars "$pkg" "$apk_path")
-  mkdir -p -- "$outdir"
-
-  # Existence probe
-  if ! with_trace adb_test -- adb -s "$DEVICE" shell test -f "$apk_path"; then
-    local rc=$?
-    LOG_CODE="${E_APK_MISSING:-31}" LOG_RC="$rc" LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" \
-      log WARN "apk missing $apk_path"
-    return 1
-  fi
-
-  LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Pulling $role APK $apk_path"
-
-  # Pull with wrapper fallbacks
-  if ! run_adb_pull_with_fallbacks "$apk_path" "$outfile"; then
-    local rc=$?
-    LOG_CODE="${E_PULL_FAIL:-32}" LOG_RC="$rc" LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" \
-      log ERROR "pull failed"
-    return 1
-  fi
-
-  if [[ ! -s "$outfile" ]]; then
-    LOG_CODE="${E_APK_EMPTY:-33}" LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" \
-      log ERROR "pulled file empty"
-    return 1
-  fi
-
-  LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Pulled $role APK $outfile"
-  printf '%s\n' "$outfile"
-}
