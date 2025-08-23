@@ -15,6 +15,16 @@ SCRIPT_DIR="$REPO_ROOT"
 LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
+DEVICE=""
+LOG_LEVEL="INFO"
+DH_DEBUG=0
+
+# Load error/logging helpers early so option parsing can use them
+# shellcheck disable=SC1090
+source "$REPO_ROOT/lib/core/errors.sh"
+# shellcheck disable=SC1090
+source "$REPO_ROOT/lib/core/logging.sh"
+
 usage() {
     cat <<USAGE
 Usage: $0 [--device ID] [--debug] [-h|--help]
@@ -23,9 +33,6 @@ Usage: $0 [--device ID] [--debug] [-h|--help]
 USAGE
 }
 
-DEVICE=""
-LOG_LEVEL="INFO"
-DH_DEBUG=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --device) DEVICE="${2:-}"; shift 2;;
@@ -40,7 +47,7 @@ export LOG_LEVEL DH_DEBUG
 source "$REPO_ROOT/config.sh"
 
 # shellcheck disable=SC1090
-for lib in core/errors core/logging core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do
+for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do
     source "$REPO_ROOT/lib/$lib.sh"
 done
 # shellcheck disable=SC1090

@@ -94,7 +94,7 @@ _pull_one_path() {
     fi
 
     # Record metadata for this artifact
-    apk_metadata "$pkg" "$outfile" || {
+    apk_metadata "$pkg" "$outfile" "$path" || {
         LOG_PKG="$pkg" log WARN "metadata_failed file=${outfile}"
         return 1
     }
