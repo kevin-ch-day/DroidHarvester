@@ -1,44 +1,56 @@
 #!/usr/bin/env bash
-# ---------------------------------------------------
-# make_executable.sh - Ensure all .sh files in this
-# project (and child dirs) are executable
-# ---------------------------------------------------
-
 set -euo pipefail
 set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-# Colors
-GREEN="\033[0;32m"
-YELLOW="\033[1;33m"
-BLUE="\033[0;34m"
-NC="\033[0m"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+SCRIPT_DIR="$REPO_ROOT"
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$REPO_ROOT/logs"
+mkdir -p "$LOG_DIR"
 
-echo -e "${BLUE}Scanning for .sh files in: $PROJECT_DIR${NC}"
+# shellcheck disable=SC1090
+source "$REPO_ROOT/config.sh"
+for m in core/logging core/errors; do
+  # shellcheck disable=SC1090
+  source "$REPO_ROOT/lib/$m.sh"
+done
 
-count=0
-changed=0
+usage() {
+  cat <<USAGE
+Usage: $0 [--debug] [-h|--help] [files...]
+USAGE
+}
 
-# Use a safer loop instead of mapfile to avoid errors when no matches
-while IFS= read -r -d '' file; do
-    ((count++))
-    if [[ ! -x "$file" ]]; then
-        chmod +x "$file"
-        echo -e "${GREEN}Made executable:${NC} $file"
-        ((changed++))
-    else
-        echo -e "${BLUE}Already executable:${NC} $file"
-    fi
-done < <(find "$PROJECT_DIR" -type f -name "*.sh" -print0)
+DEVICE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --device) DEVICE="${2:-}"; shift 2;;
+    --debug) LOG_LEVEL=DEBUG; shift;;
+    -h|--help) usage; exit 0;;
+    *) break;;
+  esac
+done
 
-if [[ $count -eq 0 ]]; then
-    echo -e "${YELLOW}No .sh files found in $PROJECT_DIR${NC}"
-    exit 0
+FILES=("$@")
+
+LOG_FILE="$LOG_DIR/make_executable_$(date +%Y%m%d_%H%M%S).txt"
+log_file_init "$LOG_FILE"
+
+if (( ${#FILES[@]} == 0 )); then
+  log WARN "no files specified"
+  exit 0
 fi
 
-echo -e "\n${BLUE}========= Summary =========${NC}"
-echo "Total .sh files found: $count"
-echo "Files updated       : $changed"
-echo -e "${BLUE}===========================${NC}\n"
+for f in "${FILES[@]}"; do
+  if [[ ! -f "$f" ]]; then
+    die "$E_IO" "File not found: $f"
+  fi
+  rel=$(realpath --relative-to="$REPO_ROOT" "$f")
+  if chmod +x "$f"; then
+    log SUCCESS "$rel"
+  else
+    die "$E_IO" "chmod failed for $f"
+  fi
+done

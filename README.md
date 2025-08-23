@@ -12,11 +12,15 @@ DroidHarvester provides an interactive shell for analysts to collect APKs from a
 ## Usage
 
 ```bash
-./run.sh           # launch the menu-driven interface
-./run.sh --debug   # enable verbose logging and xtrace file
+./run.sh                   # launch the menu-driven interface
+./run.sh --device <ID>      # preselect device
+./run.sh --debug            # enable verbose logging and xtrace file
+./run.sh -h|--help          # show options
 ```
 
-Reports live under `results/` and logs under `logs/`.
+Reports live under `results/` and logs under the repository root `logs/` directory.
+
+Each interactive session writes a transcript to `logs/harvest_log_<timestamp>.txt`.
 
 Each pulled APK is stored under `results/<device>/<package>/<apk>/` alongside
 three sidecar reports:
@@ -40,6 +44,30 @@ Enable command tracing to file:
 ```bash
 ts=$(date +%Y%m%d_%H%M%S)
 LOG_LEVEL=DEBUG ./run.sh --debug 9>"logs/trace_$ts.log"
+```
+
+## Utilities
+
+Diagnostics and maintenance scripts live under `scripts/` and are run from that directory:
+
+```bash
+cd scripts
+./diag_adb_health.sh --debug
+./test_get_apk_paths.sh --pkg <package> --debug
+./github-helper.sh --debug
+./make_executable.sh --debug
+```
+
+Each utility writes a timestamped transcript to the repository’s `logs/` folder.
+
+### Fedora packages
+
+Install common dependencies on Fedora:
+
+```bash
+sudo dnf install -y android-tools jq zip
+# optional helpers
+sudo dnf install -y shellcheck
 ```
 
 ## Targeted test recipes

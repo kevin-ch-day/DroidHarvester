@@ -7,36 +7,66 @@
 
 set -euo pipefail
 set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export SCRIPT_DIR
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_ROOT"
+SCRIPT_DIR="$REPO_ROOT"
+LOG_DIR="$REPO_ROOT/logs"
+mkdir -p "$LOG_DIR"
 
+usage() {
+    cat <<USAGE
+Usage: $0 [--device ID] [--debug] [-h|--help]
+
+--debug  increase log verbosity; transcript saved to logs/harvest_log_<ts>.txt
+USAGE
+}
+
+DEVICE=""
 LOG_LEVEL="INFO"
 DH_DEBUG=0
-if [[ "${1:-}" == "--debug" ]]; then
-    LOG_LEVEL="DEBUG"
-    DH_DEBUG=1
-fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --device) DEVICE="${2:-}"; shift 2;;
+        --debug) LOG_LEVEL="DEBUG"; DH_DEBUG=1; shift;;
+        -h|--help) usage; exit 0;;
+        *) die "$E_USAGE" "Unknown option: $1";;
+    esac
+done
 export LOG_LEVEL DH_DEBUG
 
-source "$SCRIPT_DIR/config.sh"
+# shellcheck disable=SC1090
+source "$REPO_ROOT/config.sh"
 
 # shellcheck disable=SC1090
 for lib in core/errors core/logging core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest analysis/metadata; do
-    source "$SCRIPT_DIR/lib/$lib.sh"
+    source "$REPO_ROOT/lib/$lib.sh"
 done
 # shellcheck disable=SC1090
 for action in choose_device scan_apps add_custom_package harvest list_apps search_apps view_report export_bundle resume cleanup; do
-    source "$SCRIPT_DIR/lib/actions/$action.sh"
+    source "$REPO_ROOT/lib/actions/$action.sh"
 done
 
+LOG_FILE="$LOG_DIR/harvest_log_$(date +%Y%m%d_%H%M%S).txt"
+log_file_init "$LOG_FILE"
+
 check_dependencies
+
+if [[ -n "$DEVICE" ]]; then
+    DEVICE="$(device_pick_or_fail "$DEVICE")"
+else
+    mapfile -t _devs < <(device_list_connected)
+    if (( ${#_devs[@]} == 1 )); then
+        DEVICE="${_devs[0]}"
+    fi
+fi
+
 init_session
 session_metadata
 
 if [[ $DH_DEBUG -eq 1 ]]; then
-    enable_xtrace_to_file "$LOGS_DIR/trace_$TIMESTAMP.log"
+    enable_xtrace_to_file "$LOG_DIR/trace_$TIMESTAMP.log"
 fi
 
 while true; do
