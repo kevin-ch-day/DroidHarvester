@@ -23,19 +23,22 @@ adb_healthcheck() {
 adb_retry() {
     local max=${1:-$DH_RETRIES}; shift
     local backoff=${1:-$DH_BACKOFF}; shift
-    split_label_cmd "$@" || return 127
+    local label=""; local -a cmd
+    if ! parse_wrapper_args label cmd "$@"; then
+        return 127
+    fi
 
     local attempt=0 rc=0 start end dur
     start=$(date +%s%3N)
     while (( attempt < max )); do
-        with_trace "$WRAP_LABEL" -- adb -s "$DEVICE" "${WRAP_CMD[@]}" && return 0
+        with_trace "$label" -- adb -s "$DEVICE" "${cmd[@]}" && return 0
         rc=$?
         attempt=$((attempt+1))
         (( attempt < max )) && sleep "$backoff"
     done
     end=$(date +%s%3N)
     dur=$((end-start))
-    LOG_COMP="$WRAP_LABEL" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt))" log DEBUG "adb_retry"
+    LOG_COMP="$label" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt))" log DEBUG "adb_retry"
     return "$rc"
 }
 

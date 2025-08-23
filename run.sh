@@ -9,16 +9,26 @@ set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-(( $# == 0 )) || { echo "This tool is menu-driven; run ./run.sh with no arguments." >&2; exit 64; }
+CLEAN_LOGS=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -c|--clean-logs) CLEAN_LOGS=1 ;;
+        *) echo "Usage: $0 [--clean-logs]" >&2; exit 64 ;;
+    esac
+    shift
+done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
 LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
-
-LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
-find "$LOG_DIR" -type f -mtime +"$LOG_RETENTION_DAYS" -print -delete 2>/dev/null || true
+if (( CLEAN_LOGS == 1 )); then
+    find "$LOG_DIR" -mindepth 1 -delete 2>/dev/null || true
+else
+    LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
+    find "$LOG_DIR" -type f -mtime +"$LOG_RETENTION_DAYS" -print -delete 2>/dev/null || true
+fi
 
 DEVICE=""
 LOG_LEVEL=${LOG_LEVEL:-INFO}

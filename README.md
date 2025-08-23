@@ -5,12 +5,12 @@ Bash toolkit to harvest APKs and metadata from an attached Android device via AD
 ## Usage
 
 ```bash
-./run.sh
+./run.sh [--clean-logs]
 ```
 
-Run with no arguments to open the interactive menu. Supplying any arguments causes the tool to print a short message and exit.
+Run with no arguments to open the interactive menu. Pass `--clean-logs` to remove existing log files before starting.
 
-A standalone diagnostic script lives at `scripts/adb_apk_diag.sh` and uses the same helpers.
+Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and `scripts/adb_health.sh`, both of which reuse the core helpers.
 
 ## Tests
 
