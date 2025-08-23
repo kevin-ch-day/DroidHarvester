@@ -6,9 +6,14 @@ export PATH="$ROOT/tests:$PATH"
 export DEV="FAKE_SERIAL"
 source "$ROOT/lib/io/apk_utils.sh"
 
-# 0) run.sh rejects CLI args
+# 0) run.sh CLI arg handling
+DUMMY_LOG="$ROOT/logs/dummy.log"
+mkdir -p "$(dirname "$DUMMY_LOG")"
+touch "$DUMMY_LOG"
+printf '11\n' | "$ROOT/run.sh" --clean-logs >/dev/null
+[[ ! -e "$DUMMY_LOG" ]]
 if "$ROOT/run.sh" --help >/dev/null 2>&1; then
-  echo "run.sh accepted arguments" >&2
+  echo "run.sh accepted unexpected arg" >&2
   exit 1
 fi
 
@@ -37,5 +42,6 @@ au_scan_tiktok_related | grep -iq tiktok
 
 # 6) diagnostic script runs
 DEV="FAKE_SERIAL" "$ROOT/scripts/adb_apk_diag.sh" >/dev/null
+"$ROOT/scripts/adb_health.sh" "$DEV" >/dev/null
 
 echo "OK: tests passed"
