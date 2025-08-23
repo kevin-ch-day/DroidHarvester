@@ -96,6 +96,32 @@ REPORT_FORMATS=("txt" "csv" "json")
 : "${ALLOW_MULTI_DEVICE:=false}"
 
 
+# Wrapper defaults
+: "${DH_SHELL_TIMEOUT:=15}"
+: "${DH_PULL_TIMEOUT:=60}"
+: "${DH_RETRIES:=3}"
+: "${DH_BACKOFF:=1}"
+
+validate_pos_int() { [[ "$1" =~ ^[0-9]+$ && "$1" -gt 0 ]]; }
+
+if ! validate_pos_int "$DH_SHELL_TIMEOUT"; then
+    log WARN "DH_SHELL_TIMEOUT invalid ($DH_SHELL_TIMEOUT); using default 15"
+    DH_SHELL_TIMEOUT=15
+fi
+if ! validate_pos_int "$DH_PULL_TIMEOUT"; then
+    log WARN "DH_PULL_TIMEOUT invalid ($DH_PULL_TIMEOUT); using default 60"
+    DH_PULL_TIMEOUT=60
+fi
+if ! validate_pos_int "$DH_RETRIES"; then
+    log WARN "DH_RETRIES invalid ($DH_RETRIES); using default 3"
+    DH_RETRIES=3
+fi
+if ! validate_pos_int "$DH_BACKOFF"; then
+    log WARN "DH_BACKOFF invalid ($DH_BACKOFF); using default 1"
+    DH_BACKOFF=1
+fi
+
+
 # ===============================
 # VI. ANALYST NOTES
 # ===============================

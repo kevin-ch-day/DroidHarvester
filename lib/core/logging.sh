@@ -35,7 +35,7 @@ log() {
     local ts_human="$(date +'%H:%M:%S')"
     local ts_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     local dev_field="${LOG_DEV:-${DEVICE:- -}}"
-    local structured="ts=$ts_iso lvl=$level sid=${SESSION_ID:- -} code=${LOG_CODE:- -} comp=${LOG_COMP:- -} func=${LOG_FUNC:- -} dev=${dev_field} pkg=${LOG_PKG:- -} apk=${LOG_APK:- -} dur_ms=${LOG_DUR_MS:- -} rc=${LOG_RC:- -} msg=\"$msg\""
+    local structured="ts=$ts_iso lvl=$level sid=${SESSION_ID:- -} code=${LOG_CODE:- -} comp=${LOG_COMP:- -} func=${LOG_FUNC:- -} dev=${dev_field} pkg=${LOG_PKG:- -} apk=${LOG_APK:- -} dur_ms=${LOG_DUR_MS:- -} attempts=${LOG_ATTEMPTS:- -} rc=${LOG_RC:- -} msg=\"$msg\""
     local color prefix
     case "$level" in
         DEBUG)

@@ -7,9 +7,9 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 
 : "${DH_RETRIES:=3}"
-: "${DH_BACKOFF:=1.5}"
-: "${DH_PULL_TIMEOUT:=120}"
-: "${DH_SHELL_TIMEOUT:=20}"
+: "${DH_BACKOFF:=1}"
+: "${DH_PULL_TIMEOUT:=60}"
+: "${DH_SHELL_TIMEOUT:=15}"
 
 adb_healthcheck() {
     LOG_COMP="adb" log INFO "adb get-state" && adb get-state || true
@@ -18,29 +18,27 @@ adb_healthcheck() {
     LOG_COMP="host" log INFO "host df" && df -h . || true
 }
 
-adb_run() {
-    local comp="adb"
-    with_trace "$comp" adb -s "$DEVICE" "$@"
-}
-
 adb_retry() {
     local max=${1:-$DH_RETRIES}; shift
     local backoff=${1:-$DH_BACKOFF}; shift
-    [[ "$1" == "--" ]] && shift
-    local attempt=0 rc
+    split_label_cmd "$@" || return 127
+    local attempt=0 rc=0 start end dur
+    start=$(date +%s%3N)
     while (( attempt < max )); do
-        if adb_run "$@"; then
-            return 0
-        fi
+        with_trace "$WRAP_LABEL" -- adb -s "$DEVICE" "${WRAP_CMD[@]}"
         rc=$?
+        [[ $rc -eq 0 ]] && break
         attempt=$((attempt+1))
-        sleep "$(awk -v b="$backoff" -v a="$attempt" 'BEGIN{print b^a}')"
+        (( attempt < max )) && sleep "$backoff"
     done
+    end=$(date +%s%3N)
+    dur=$((end-start))
+    LOG_COMP="$WRAP_LABEL" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt+1))" log DEBUG "adb_retry"
     return "$rc"
 }
 
 adb_shell() {
-    adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- shell "$@"
+    adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_shell -- shell "$@"
 }
 
 # List connected device IDs

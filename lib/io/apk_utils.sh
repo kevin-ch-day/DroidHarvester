@@ -9,7 +9,9 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 get_apk_paths() {
     local pkg="$1"
     local output rc
-    output=$(with_timeout "$DH_SHELL_TIMEOUT" pm_path -- adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- shell pm path "$pkg" 2>/dev/null)
+    output=$(with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
+        adb_retry "$DH_RETRIES" "$DH_BACKOFF" pm_path -- \
+            shell pm path "$pkg" 2>/dev/null)
     rc=$?
     if (( rc != 0 )); then
         LOG_CODE="$E_PM_PATH" LOG_RC="$rc" LOG_PKG="$pkg" log ERROR "pm path failed"
@@ -42,7 +44,9 @@ pull_apk() {
     fi
 
     LOG_PKG="$pkg" LOG_APK="$safe_name" log INFO "Pulling $role APK $apk_path"
-    if ! with_timeout "$DH_PULL_TIMEOUT" adb_pull -- adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- pull "$apk_path" "$outfile"; then
+    if ! with_timeout "$DH_PULL_TIMEOUT" adb_pull -- \
+        adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_pull -- \
+            pull "$apk_path" "$outfile"; then
         local rc=$?
         LOG_CODE="$E_PULL_FAIL" LOG_RC="$rc" LOG_PKG="$pkg" LOG_APK="$safe_name" log ERROR "pull failed"
         return 1
