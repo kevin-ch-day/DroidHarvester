@@ -6,10 +6,6 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # device.sh - ADB helpers with retry/backoff
 # ---------------------------------------------------
 
-: "${DH_RETRIES:=3}"
-: "${DH_BACKOFF:=1.5}"
-: "${DH_PULL_TIMEOUT:=120}"
-: "${DH_SHELL_TIMEOUT:=20}"
 
 adb_healthcheck() {
     LOG_COMP="adb" log INFO "adb get-state" && adb get-state || true
@@ -20,16 +16,20 @@ adb_healthcheck() {
 
 adb_run() {
     local comp="adb"
-    with_trace "$comp" adb -s "$DEVICE" "$@"
+    with_trace "$comp" -- adb -s "$DEVICE" "$@"
 }
 
 adb_retry() {
     local max=${1:-$DH_RETRIES}; shift
     local backoff=${1:-$DH_BACKOFF}; shift
-    [[ "$1" == "--" ]] && shift
+    local label
+    local -a cmd
+    if ! parse_wrapper_args label cmd "$@"; then
+        return 127
+    fi
     local attempt=0 rc
     while (( attempt < max )); do
-        if adb_run "$@"; then
+        if adb_run "${cmd[@]}"; then
             return 0
         fi
         rc=$?
@@ -40,7 +40,7 @@ adb_retry() {
 }
 
 adb_shell() {
-    adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- shell "$@"
+    adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_shell -- shell "$@"
 }
 
 # List connected device IDs
