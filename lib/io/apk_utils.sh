@@ -348,3 +348,110 @@ apk_paths_describe() {
     printf '%s\t%s\t%s\n' "$p" "$(apk_split_role "$p")" "$(apk_install_partition "$p")"
   done
 }
+
+# -----------------------------------------------------------------------------
+# Simplified, centralized helpers
+# -----------------------------------------------------------------------------
+
+# Raw pm path output for a package
+au_pm_path_raw() {
+  local pkg="$1" dev="${DEV:-${DEVICE:-}}"
+  adb -s "$dev" shell pm path "$pkg"
+}
+
+# Sanitize pm path output (strip leading 'package:')
+au_pm_path_sanitize() {
+  tr -d '\r' | sed -n 's/^package://p'
+}
+
+# Convenience: list sanitized APK paths for a package
+au_apk_paths_for_pkg() {
+  au_pm_path_raw "$1" | au_pm_path_sanitize
+}
+
+# Pick base.apk if present, else first path from file
+au_pick_base_apk() {
+  local file="$1"
+  local base
+  base=$(grep '/base\.apk$' "$file" | head -n1)
+  [[ -n "$base" ]] && { echo "$base"; return 0; }
+  head -n1 "$file"
+}
+
+# Get device file size in bytes
+au_dev_file_size() {
+  local path="$1" dev="${DEV:-${DEVICE:-}}"
+  adb -s "$dev" shell stat -c %s "$path" | tr -d '\r'
+}
+
+# Pull one file, echo local path
+au_pull_one() {
+  local src="$1" dest_dir="$2" dev="${DEV:-${DEVICE:-}}"
+  mkdir -p "$dest_dir"
+  local dest="$dest_dir/$(basename "$src")"
+  adb -s "$dev" pull "$src" "$dest" >/dev/null
+  echo "$dest"
+}
+
+# Detect hash command on device
+au_detect_device_hash_cmd() {
+  local dev="${DEV:-${DEVICE:-}}"
+  if adb -s "$dev" shell 'command -v sha256sum >/dev/null 2>&1'; then
+    echo sha256sum
+  elif adb -s "$dev" shell 'command -v md5sum >/dev/null 2>&1'; then
+    echo md5sum
+  else
+    echo ""
+  fi
+}
+
+# Verify device vs local hash (best effort)
+au_verify_hash() {
+  local dev_path="$1" local_path="$2" dev="${DEV:-${DEVICE:-}}"
+  local cmd
+  cmd=$(au_detect_device_hash_cmd) || true
+  [[ -z "$cmd" ]] && return 0
+  local dev_hash
+  dev_hash=$(adb -s "$dev" shell "$cmd '$dev_path'" | awk '{print $1}')
+  command -v "$cmd" >/dev/null 2>&1 || return 0
+  local local_hash
+  local_hash=$($cmd "$local_path" | awk '{print $1}')
+  [[ "$dev_hash" == "$local_hash" ]]
+}
+
+# Metadata helpers
+au_pkg_meta() {
+  local pkg="$1" dev="${DEV:-${DEVICE:-}}"
+  adb -s "$dev" shell dumpsys package "$pkg"
+}
+
+au_pkg_meta_csv_line() {
+  local pkg="$1" meta vn vc inst
+  meta="$(au_pkg_meta "$pkg")"
+  vn=$(printf '%s' "$meta" | awk -F= '/versionName=/{print $2; exit}' | tr -d '\r')
+  vc=$(printf '%s' "$meta" | awk -F= '/versionCode=/{print $2; exit}' | awk '{print $1}')
+  inst=$(printf '%s' "$meta" | awk -F= '/installerPackageName=/{print $2; exit}' | tr -d '\r')
+  printf '%s,%s,%s,%s\n' "$pkg" "$vn" "$vc" "$inst"
+}
+
+# Package discovery
+au_packages_all() {
+  local dev="${DEV:-${DEVICE:-}}"
+  adb -s "$dev" shell pm list packages | tr -d '\r' | sed -n 's/^package://p'
+}
+
+au_scan_tiktok_family() {
+  au_packages_all | grep -E '^(com\.zhiliaoapp\.musically|com\.ss\.android\.ugc\.aweme(\.lite)?|com\.ss\.android\.ugc\.trill|com\.bytedance\.)'
+}
+
+au_scan_tiktok_related() {
+  au_packages_all | grep -iE 'tiktok|aweme|trill|musically|bytedance'
+}
+
+au_pm_list_third_party_csv() {
+  local dev="${DEV:-${DEVICE:-}}"
+  adb -s "$dev" shell pm list packages -f -3 | tr -d '\r' | sed -n 's/^package://p' |
+    while IFS='=' read -r path pkg; do
+      printf '%s,%s\n' "$path" "$pkg"
+    done
+}

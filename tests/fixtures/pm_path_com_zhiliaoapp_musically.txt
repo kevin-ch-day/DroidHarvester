@@ -1,0 +1,2 @@
+package:/data/app/com.zhiliaoapp.musically-1/base.apk
+package:/data/app/com.zhiliaoapp.musically-1/split_config.en.apk

@@ -1,0 +1,2 @@
+package:/data/app/com.zhiliaoapp.musically-1/base.apk=com.zhiliaoapp.musically
+package:/data/app/com.example.app-1/base.apk=com.example.app
