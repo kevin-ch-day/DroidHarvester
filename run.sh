@@ -67,24 +67,19 @@ fi
 
 # Resolve device if pre-set or auto-pick single attached device
 if [[ -n "${DEVICE}" ]]; then
-    DEVICE="$(printf '%s' "$DEVICE" | tr -d '\r' | xargs)"
+    DEVICE="$(normalize_serial "$DEVICE")"
     DEVICE="$(device_pick_or_fail "$DEVICE")"
+    set_device "$DEVICE" || DEVICE=""
 else
     mapfile -t _devs < <(device_list_connected)
     if (( ${#_devs[@]} == 1 )); then
-        DEVICE="${_devs[0]}"
+        set_device "${_devs[0]}" || true
     fi
 fi
 
 if [[ -n "$DEVICE" ]]; then
-    # Ensure it's really usable
     if ! assert_device_ready "$DEVICE"; then
         DEVICE=""
-    else
-        # Set common ADB flags if helper exists
-        if type update_adb_flags >/dev/null 2>&1; then
-            update_adb_flags
-        fi
     fi
 fi
 

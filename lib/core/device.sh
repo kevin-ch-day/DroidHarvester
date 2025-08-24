@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # device.sh - ADB helpers with retry/backoff
 # ---------------------------------------------------
@@ -19,17 +19,38 @@ update_adb_flags() {
     export ADB_FLAGS
 }
 
+# Normalize a serial by stripping CR and surrounding whitespace
+normalize_serial() {
+    printf '%s' "$1" | tr -d '\r' | xargs
+}
+
+# Set global DEVICE after normalization
+set_device() {
+    local serial
+    serial="$(normalize_serial "$1")"
+    [[ -n "$serial" ]] || return 1
+    DEVICE="$serial"
+    update_adb_flags
+    export DEVICE
+    if [[ "${DEBUG:-0}" == "1" ]]; then
+        printf '[DEBUG] DEV="%s"\n' "$DEVICE"
+        printf '[DEBUG] DEV bytes: '
+        printf '%s' "$DEVICE" | hexdump -C | sed -n '1p'
+    fi
+}
+
 adb_healthcheck() {
-    LOG_COMP="adb" log INFO "adb get-state" && adb get-state || true
-    LOG_COMP="adb" log INFO "adb $ADB_FLAGS shell echo OK" && adb $ADB_FLAGS shell echo OK || true
-    LOG_COMP="adb" log INFO "device df" && adb $ADB_FLAGS shell df -h /data || true
+    LOG_COMP="adb" log INFO "adb get-state" && adb get-state >/dev/null 2>&1 || true
+    LOG_COMP="adb" log INFO "adb $ADB_FLAGS shell echo OK" && adb $ADB_FLAGS shell echo OK >/dev/null 2>&1 || true
+    LOG_COMP="adb" log INFO "device df" && adb $ADB_FLAGS shell df -h /data >/dev/null 2>&1 || true
     LOG_COMP="host" log INFO "host df" && df -h . || true
 }
 
-# Wrapper with retries and exponential backoff
+# Wrapper that retries an adb subcommand with timeout
 adb_retry() {
-    local max=${1:-$DH_RETRIES}; shift
-    local backoff=${1:-$DH_BACKOFF}; shift
+    local timeout="${1:-$DH_SHELL_TIMEOUT}"; shift
+    local max="${1:-$DH_RETRIES}"; shift
+    local backoff="${1:-$DH_BACKOFF}"; shift
     local label=""; local -a cmd
     if ! parse_wrapper_args label cmd "$@"; then
         return 127
@@ -38,19 +59,31 @@ adb_retry() {
     local attempt=0 rc=0 start end dur
     start=$(date +%s%3N)
     while (( attempt < max )); do
-        with_trace "$label" -- adb $ADB_FLAGS "${cmd[@]}" && return 0
+        with_trace "$label" -- timeout --preserve-status -- "$timeout" adb $ADB_FLAGS "${cmd[@]}" && { rc=0; break; }
         rc=$?
         attempt=$((attempt+1))
         (( attempt < max )) && sleep "$backoff"
     done
     end=$(date +%s%3N)
     dur=$((end-start))
-    LOG_COMP="$label" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$((attempt))" log DEBUG "adb_retry"
+    LOG_COMP="$label" LOG_RC="$rc" LOG_DUR_MS="$dur" LOG_ATTEMPTS="$attempt" log DEBUG "adb_retry"
     return "$rc"
 }
 
 adb_shell() {
-    adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_shell -- shell "$@"
+    adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" adb_shell -- shell "$@"
+}
+
+adb_pull() {
+    adb_retry "$DH_PULL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" adb_pull -- pull "$@"
+}
+
+adb_get_state() {
+    if [[ $# -gt 0 ]]; then
+        adb -s "$1" get-state
+    else
+        adb $ADB_FLAGS get-state
+    fi
 }
 
 # List connected device IDs, trimmed of whitespace/CR
@@ -61,7 +94,7 @@ device_list_connected() {
 # device_pick_or_fail [DEVICE]
 device_pick_or_fail() {
     local specified="${1:-}"
-    specified="$(printf '%s' "$specified" | tr -d '\r' | xargs)"
+    specified="$(normalize_serial "$specified")"
     mapfile -t devs < <(device_list_connected)
     if [[ -n "$specified" ]]; then
         if printf '%s\n' "${devs[@]}" | grep -Fxq "$specified"; then
@@ -88,7 +121,7 @@ get_normalized_serial() {
         state="${state##*[[:space:]]}"
         case "$state" in
             device)
-                devs+=("$(printf '%s' "$serial" | tr -d '\r' | xargs)")
+                devs+=("$(normalize_serial "$serial")")
                 ;;
             unauthorized)
                 printf '[ERR] device %q unauthorized\n' "$serial" >&2
@@ -107,7 +140,7 @@ get_normalized_serial() {
 # Ensure device is in state "device"
 assert_device_ready() {
     local s="$1"
-    adb -s "$s" get-state 1>/dev/null || {
+    adb_get_state "$s" >/dev/null 2>&1 || {
         echo "[ERR] device '$s' not ready (need state=device)." >&2
         return 1
     }

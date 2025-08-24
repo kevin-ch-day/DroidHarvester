@@ -6,14 +6,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Shared helpers
 # shellcheck disable=SC1090
+source "$ROOT/lib/core/logging.sh"
+# shellcheck disable=SC1090
 source "$ROOT/lib/io/apk_utils.sh"
+# shellcheck disable=SC1090
+source "$ROOT/lib/core/trace.sh"
 # shellcheck disable=SC1090
 source "$ROOT/lib/core/device.sh"
 
 # ---- Device resolution -------------------------------------------------------
 if [[ -z "${DEV:-}" ]]; then
   if tmp_dev="$(get_normalized_serial)"; then
-    DEV="$tmp_dev"
+    set_device "$tmp_dev"
   else
     rc=$?
     case "$rc" in
@@ -25,22 +29,10 @@ if [[ -z "${DEV:-}" ]]; then
     exit 1
   fi
 else
-  DEV="$(printf '%s' "$DEV" | tr -d '\r' | xargs)"
+  set_device "$DEV" || true
 fi
 
-DEVICE="$DEV"
 assert_device_ready "$DEVICE"
-
-# Prefer centralized ADB flags if available
-if type update_adb_flags >/dev/null 2>&1; then
-  update_adb_flags
-fi
-
-if [[ "${DEBUG:-0}" == "1" ]]; then
-  printf '[DEBUG] DEV="%s"\n' "$DEV"
-  printf '[DEBUG] DEV bytes: '
-  printf '%s' "$DEV" | hexdump -C | sed -n '1p'
-fi
 
 # ---- Working dirs ------------------------------------------------------------
 base="$ROOT/results/$DEVICE"

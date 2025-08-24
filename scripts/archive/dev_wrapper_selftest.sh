@@ -71,7 +71,7 @@ report() {
 
   # adb_retry missing "--"
   set +e
-  adb_retry 1 0 label echo hi >/dev/null 2>&1; rc=$?
+  adb_retry 1 1 0 label echo hi >/dev/null 2>&1; rc=$?
   set -e
   report $rc 127 "adb_retry missing --"
 
@@ -90,7 +90,7 @@ SH
   PATH="$TMPDIR:$PATH:$PATH"
   DEVICE="test"
   set +e
-  adb_retry 5 0 retrytest -- get-state >/dev/null 2>>"$LOG_FILE.log"; rc=$?
+  adb_retry 1 5 0 retrytest -- get-state >/dev/null 2>>"$LOG_FILE.log"; rc=$?
   set -e
   report $rc 0 "adb_retry succeeds after retries"
   if ! grep -q 'attempts=3' "$LOG_FILE.log"; then

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+args=()
+for a in "$@"; do
+  [[ "$a" == "-C" ]] && continue
+  args+=("$a")
+done
+LC_ALL=C od -An -tx1 -v "${args[@]}" | awk 'NR==1 {printf "00000000 "; for(i=1;i<=NF;i++) printf "%s ", $i; printf " |"; for(i=1;i<=NF;i++){c=strtonum("0x"$i); printf "%s",(c>=32&&c<127)?sprintf("%c",c):"."} print "|"}'

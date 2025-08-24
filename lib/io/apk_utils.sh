@@ -93,14 +93,12 @@ _pm_path_run() {
   local variant="$1" pkg="$2"
   case "$variant" in
     A)
-      with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" pm_path -- \
-          shell pm path "$pkg" 2>/dev/null
+      adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" pm_path -- \
+        shell pm path "$pkg" 2>/dev/null
       ;;
     B)
-      with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- \
-          shell pm path "$pkg" 2>/dev/null
+      adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" '' -- \
+        shell pm path "$pkg" 2>/dev/null
       ;;
     C)
       with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
@@ -153,8 +151,7 @@ apk_get_paths() {
 apk_list_third_party() {
   local output rc
   output=$(
-    with_timeout "$DH_SHELL_TIMEOUT" pm_list -- \
-      adb_retry "$DH_RETRIES" "$DH_BACKOFF" pm_list -- \
+    adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" pm_list -- \
         shell pm list packages -3 2>/dev/null
   )
   rc=$?
@@ -187,15 +184,13 @@ device_sha256() {
   local path="$1" out rc
   # Try common variants (toybox, busybox, coreutils)
   out=$(
-    with_timeout "$DH_SHELL_TIMEOUT" sha_dev -- \
-      adb_retry "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
+    adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
         shell 'command -v sha256sum >/dev/null 2>&1 && sha256sum "$0" || (command -v toybox >/dev/null 2>&1 && toybox sha256sum "$0")' "$path" 2>/dev/null
   ); rc=$?
   if (( rc != 0 )) || [[ -z "${out:-}" ]]; then
     # Fallback: some builds output just hash or "hash  filename"
     out=$(
-      with_timeout "$DH_SHELL_TIMEOUT" sha_dev -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
+      adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
           shell sha256sum "$path" 2>/dev/null
     ) || true
   fi
@@ -217,13 +212,11 @@ _adb_pull_run() {
   local variant="$1" src="$2" dst="$3"
   case "$variant" in
     A)
-      with_timeout "$DH_PULL_TIMEOUT" adb_pull -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_pull -- \
+      adb_retry "$DH_PULL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" adb_pull -- \
           pull "$src" "$dst"
       ;;
     B)
-      with_timeout "$DH_PULL_TIMEOUT" adb_pull -- \
-        adb_retry "$DH_RETRIES" "$DH_BACKOFF" -- \
+      adb_retry "$DH_PULL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" '' -- \
           pull "$src" "$dst"
       ;;
     C)
@@ -247,10 +240,10 @@ run_adb_pull_with_fallbacks() {
   if (( rc != 0 )); then
     LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying copy fallback"
     tmp="/data/local/tmp/$(basename "$dst")"
-    adb $ADB_FLAGS shell cp "$src" "$tmp" >/dev/null 2>&1
+    adb_shell cp "$src" "$tmp" >/dev/null 2>&1
     if (( $? == 0 )); then
       _adb_pull_run A "$tmp" "$dst"; rc=$?
-      adb $ADB_FLAGS shell rm -f "$tmp" >/dev/null 2>&1 || true
+      adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
     else
       LOG_APK="$(basename "$dst")" log WARN "device-side copy failed"
     fi
@@ -360,8 +353,8 @@ apk_paths_describe() {
 
 # Raw pm path output for a package
 au_pm_path_raw() {
-  local pkg="$1" dev="${DEV:-${DEVICE:-}}"
-  adb -s "$dev" shell pm path "$pkg"
+  local pkg="$1"
+  adb_shell pm path "$pkg"
 }
 
 # Sanitize pm path output (strip leading 'package:')
@@ -385,25 +378,24 @@ au_pick_base_apk() {
 
 # Get device file size in bytes
 au_dev_file_size() {
-  local path="$1" dev="${DEV:-${DEVICE:-}}"
-  adb -s "$dev" shell stat -c %s "$path" | tr -d '\r'
+  local path="$1"
+  adb_shell stat -c %s "$path" | tr -d '\r'
 }
 
 # Pull one file, echo local path
 au_pull_one() {
-  local src="$1" dest_dir="$2" dev="${DEV:-${DEVICE:-}}"
+  local src="$1" dest_dir="$2"
   mkdir -p "$dest_dir"
   local dest="$dest_dir/$(basename "$src")"
-  adb -s "$dev" pull "$src" "$dest" >/dev/null
+  adb_pull "$src" "$dest" >/dev/null
   echo "$dest"
 }
 
 # Detect hash command on device
 au_detect_device_hash_cmd() {
-  local dev="${DEV:-${DEVICE:-}}"
-  if adb -s "$dev" shell 'command -v sha256sum >/dev/null 2>&1'; then
+  if adb_shell command -v sha256sum >/dev/null 2>&1; then
     echo sha256sum
-  elif adb -s "$dev" shell 'command -v md5sum >/dev/null 2>&1'; then
+  elif adb_shell command -v md5sum >/dev/null 2>&1; then
     echo md5sum
   else
     echo ""
@@ -412,12 +404,12 @@ au_detect_device_hash_cmd() {
 
 # Verify device vs local hash (best effort)
 au_verify_hash() {
-  local dev_path="$1" local_path="$2" dev="${DEV:-${DEVICE:-}}"
+  local dev_path="$1" local_path="$2"
   local cmd
   cmd=$(au_detect_device_hash_cmd) || true
   [[ -z "$cmd" ]] && return 0
   local dev_hash
-  dev_hash=$(adb -s "$dev" shell "$cmd '$dev_path'" | awk '{print $1}')
+  dev_hash=$(adb_shell "$cmd" "$dev_path" | awk '{print $1}')
   command -v "$cmd" >/dev/null 2>&1 || return 0
   local local_hash
   local_hash=$($cmd "$local_path" | awk '{print $1}')
@@ -426,8 +418,8 @@ au_verify_hash() {
 
 # Metadata helpers
 au_pkg_meta() {
-  local pkg="$1" dev="${DEV:-${DEVICE:-}}"
-  adb -s "$dev" shell dumpsys package "$pkg"
+  local pkg="$1"
+  adb_shell dumpsys package "$pkg"
 }
 
 au_pkg_meta_csv_line() {
@@ -441,8 +433,7 @@ au_pkg_meta_csv_line() {
 
 # Package discovery
 au_packages_all() {
-  local dev="${DEV:-${DEVICE:-}}"
-  adb -s "$dev" shell pm list packages | tr -d '\r' | sed -n 's/^package://p'
+  adb_shell pm list packages | tr -d '\r' | sed -n 's/^package://p'
 }
 
 au_scan_tiktok_family() {
@@ -454,8 +445,7 @@ au_scan_tiktok_related() {
 }
 
 au_pm_list_third_party_csv() {
-  local dev="${DEV:-${DEVICE:-}}"
-  adb -s "$dev" shell pm list packages -f -3 | tr -d '\r' | sed -n 's/^package://p' |
+  adb_shell pm list packages -f -3 | tr -d '\r' | sed -n 's/^package://p' |
     while IFS='=' read -r path pkg; do
       printf '%s,%s\n' "$path" "$pkg"
     done
