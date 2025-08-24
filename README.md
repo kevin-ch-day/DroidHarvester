@@ -22,25 +22,3 @@ If multiple devices are connected, set `DEV` explicitly or use the interactive m
 adb kill-server
 adb devices    # accept the RSA prompt on the device
 ```
-
-APK pulls may fail on some retail devices due to filesystem restrictions. DroidHarvester first attempts a direct `adb pull`, then
-copies the APK to a readable location on the device and retries. If that also fails, the log will note `pull failed` and the device
-likely blocks access. Retail builds often disallow pulling `/data/app` files; use a debug build or accept that extraction is not
-possible.
-
-### Troubleshooting
-
-- **Unauthorized / offline** – run `adb kill-server; adb devices` and accept the RSA prompt on the device.
-- **Multiple devices** – specify `DEV=<serial>` or select via the menu.
-- **Pull failures** – check logs for the copy fallback messages; if both direct and fallback pulls fail, the device is restricting
-  access and the APK cannot be harvested.
-
-## Tests
-
-A fake-ADB harness under `tests/fakes/` allows running checks without a device:
-
-```bash
-bash -n run.sh lib/**/*.sh scripts/**/*.sh
-shellcheck -S warning run.sh lib/**/*.sh scripts/**/*.sh || true
-tests/run.sh
-```

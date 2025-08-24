@@ -9,6 +9,7 @@ set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
+# Optional: allow log cleanup via flag (safe to remove if you want no-args only)
 CLEAN_LOGS=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -21,6 +22,7 @@ done
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
+
 DEVICE=""
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 DH_DEBUG=${DH_DEBUG:-0}
@@ -33,16 +35,22 @@ source "$REPO_ROOT/lib/core/logging.sh"
 
 export LOG_LEVEL DH_DEBUG
 
+# Load config
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config.sh"
 validate_config
 
+# Core + IO + menu libs
 # shellcheck disable=SC1090
 for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest; do
+    # shellcheck disable=SC1090
     source "$REPO_ROOT/lib/$lib.sh"
 done
+
+# Actions
 # shellcheck disable=SC1090
 for action in choose_device scan_apps add_custom_package harvest list_apps search_apps view_report export_bundle resume cleanup; do
+    # shellcheck disable=SC1090
     source "$REPO_ROOT/lib/actions/$action.sh"
 done
 
@@ -51,7 +59,14 @@ log_file_init "$LOGFILE"
 
 check_dependencies
 
-if [[ -n "$DEVICE" ]]; then
+# One-time optional cleanup if requested
+if (( CLEAN_LOGS == 1 )); then
+    # Use the existing action to purge partial runs/logs as implemented in your repo
+    cleanup_partial_run || true
+fi
+
+# Resolve device if pre-set or auto-pick single attached device
+if [[ -n "${DEVICE}" ]]; then
     DEVICE="$(printf '%s' "$DEVICE" | tr -d '\r' | xargs)"
     DEVICE="$(device_pick_or_fail "$DEVICE")"
 else
@@ -60,9 +75,17 @@ else
         DEVICE="${_devs[0]}"
     fi
 fi
+
 if [[ -n "$DEVICE" ]]; then
-    assert_device_ready "$DEVICE" || DEVICE=""
-    update_adb_flags
+    # Ensure it's really usable
+    if ! assert_device_ready "$DEVICE"; then
+        DEVICE=""
+    else
+        # Set common ADB flags if helper exists
+        if type update_adb_flags >/dev/null 2>&1; then
+            update_adb_flags
+        fi
+    fi
 fi
 
 session_metadata
@@ -112,5 +135,4 @@ while true; do
 
     draw_menu_footer
     pause
-
 done
