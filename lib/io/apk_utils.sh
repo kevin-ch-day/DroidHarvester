@@ -52,7 +52,7 @@ safe_apk_name() {
 # -> echoes: data|system|system_ext|product|vendor|apex|other
 apk_install_partition() {
   case "$1" in
-    /data/app* )    echo data ;;
+    /data/app* )    echo data ;; 
     /system/* )     echo system ;;
     /system_ext/* ) echo system_ext ;;
     /product/* )    echo product ;;
@@ -118,12 +118,12 @@ run_pm_path_with_fallbacks() {
   trap - ERR
   set +e
 
-  out="$(_pm_path_run A "$pkg")"; rc=$?; tries+="A:$rc "
+  out="$(_pm_path_run A "$pkg")"; rc=$?; tries+="A:"$rc" "
   if (( rc != 0 )); then
-    out="$(_pm_path_run B "$pkg")"; rc=$?; tries+="B:$rc "
+    out="$(_pm_path_run B "$pkg")"; rc=$?; tries+="B:"$rc" "
   fi
   if (( rc != 0 )); then
-    out="$(_pm_path_run C "$pkg")"; rc=$?; tries+="C:$rc "
+    out="$(_pm_path_run C "$pkg")"; rc=$?; tries+="C:"$rc" "
   fi
 
   set -e
@@ -150,7 +150,7 @@ apk_get_paths() {
 # Usage: apk_list_third_party
 apk_list_third_party() {
   local output rc
-  output=$(
+  output=$( 
     adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" pm_list -- \
         shell pm list packages -3 2>/dev/null
   )
@@ -183,13 +183,13 @@ apk_paths_verify() {
 device_sha256() {
   local path="$1" out rc
   # Try common variants (toybox, busybox, coreutils)
-  out=$(
+  out=$( 
     adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
         shell 'command -v sha256sum >/dev/null 2>&1 && sha256sum "$0" || (command -v toybox >/dev/null 2>&1 && toybox sha256sum "$0")' "$path" 2>/dev/null
   ); rc=$?
   if (( rc != 0 )) || [[ -z "${out:-}" ]]; then
     # Fallback: some builds output just hash or "hash  filename"
-    out=$(
+    out=$( 
       adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
           shell sha256sum "$path" 2>/dev/null
     ) || true
@@ -240,8 +240,7 @@ run_adb_pull_with_fallbacks() {
   if (( rc != 0 )); then
     LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying copy fallback"
     tmp="/data/local/tmp/$(basename "$dst")"
-    adb_shell cp "$src" "$tmp" >/dev/null 2>&1
-    if (( $? == 0 )); then
+    if adb_shell cp "$src" "$tmp" >/dev/null 2>&1; then
       _adb_pull_run A "$tmp" "$dst"; rc=$?
       adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
     else
