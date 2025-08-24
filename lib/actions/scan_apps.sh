@@ -16,7 +16,7 @@ scan_apps() {
         LOG_CODE="$E_PM_LIST" LOG_RC="$rc" log ERROR "failed to list packages"
         adb_get_state >/dev/null 2>&1 || true
         if [[ "${DH_DEBUG:-0}" == "1" ]]; then
-            printf '[CMD] adb %s shell pm list packages\n' "$ADB_FLAGS" >&2
+            printf '[CMD] adb %s shell pm list packages\n' "${ADB_ARGS[*]}" >&2
             printf '%s\n' "$pkg_list" >&2
         fi
         return 1

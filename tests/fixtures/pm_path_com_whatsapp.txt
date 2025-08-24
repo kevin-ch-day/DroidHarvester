@@ -1,0 +1,2 @@
+package:/data/app/~~1s1a872NnDIeEuSxr6EfUw==/com.whatsapp-ZacC6_YVQdU9snankbRX5A==/base.apk
+package:/data/app/~~1s1a872NnDIeEuSxr6EfUw==/com.whatsapp-ZacC6_YVQdU9snankbRX5A==/split_config.arm64_v8a.apk

@@ -2,15 +2,30 @@
 
 Bash toolkit to harvest APKs and metadata from an attached Android device via ADB.
 
+## Prerequisites
+
+- [Android Debug Bridge (ADB)](https://developer.android.com/studio/command-line/adb)
+- A device with USB debugging enabled
+
 ## Usage
 
 ```bash
 ./run.sh [--clean-logs]
 ```
 
-Run with no arguments to open the interactive menu. Pass `--clean-logs` to remove existing log files before starting.
+Run with no arguments to open the interactive menu. Pass `--clean-logs` to remove
+existing log files before starting.
 
-Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and `scripts/adb_health.sh`, both of which reuse the core helpers.
+Typical workflow:
+
+1. Connect a single device and run `./run.sh`.
+2. Choose **Scan for target apps** to detect installed packages.
+3. Choose **Harvest** to pull APK splits and metadata for discovered apps.
+
+Artifacts and logs are written under `results/<serial>/` and `logs/` by default.
+
+Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and
+`scripts/adb_health.sh`, both of which reuse the core helpers.
 
 ## Device selection
 
@@ -26,9 +41,55 @@ adb kill-server
 adb devices    # accept the RSA prompt on the device
 ```
 
+## Device capability report
+
+The interactive menu includes a **Device capability report** option. It prints
+build tags (`ro.build.tags`), debug status (`ro.debuggable`), root availability,
+and the harvest strategy selected for each target package. Reviewing this output
+helps explain why APK pulls may succeed or be skipped on a given device.
+
 ## Pull limitations
 
 Retail builds often block direct pulls from `/data/app`. The tools try a
-fallback copy to `/data/local/tmp`; if that also fails you'll see a
-`Permission denied` message, but the session continues and still produces
-a report.
+series of fallbacks: copy via `run-as` for debuggable apps, or `su 0 cp`
+to `/data/local/tmp` when root is present. If every attempt fails you'll
+see a `Permission denied` message, but the session continues and still
+produces a report.
+
+## Why APK pulls may fail on retail devices
+
+On stock, non-rooted phones most app code under `/data/app` isn't readable by
+the shell user. DroidHarvester probes each package once and picks the first
+working strategy:
+
+1. Direct `adb pull` if the file is readable.
+2. `run-as <package>` copy for debuggable apps.
+3. `su 0` copy when root is available.
+
+If none succeed you'll see a message such as:
+
+```
+[ERR] com.whatsapp: APKs not readable on device (no direct read, no run-as, no root)
+```
+
+In this case the tool skips APK binaries but still records metadata.
+
+## Debugging & environment knobs
+
+The behaviour of pull helpers can be tuned with environment variables:
+
+| Variable | Effect |
+|----------|--------|
+| `DEBUG=1` | Print extra device/command traces. |
+| `DH_DRY_RUN=1` | Show planned actions without pulling files. |
+| `DH_INCLUDE_SPLITS=0` | Pull only base APKs, skip splits. |
+| `DH_VERIFY_PULL=0` | Skip SHA256 verification of pulled files. |
+
+## Tests
+
+The repository includes a small integration test suite that uses a fake ADB
+shim. Run it with:
+
+```bash
+tests/run.sh
+```
