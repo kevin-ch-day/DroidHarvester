@@ -46,14 +46,15 @@ adb_shell() {
     adb_retry "$DH_RETRIES" "$DH_BACKOFF" adb_shell -- shell "$@"
 }
 
-# List connected device IDs
+# List connected device IDs, trimmed of whitespace/CR
 device_list_connected() {
-    adb devices | awk 'NR>1 && $2=="device" {print $1}'
+    adb devices | awk 'NR>1 && $2=="device" {print $1}' | tr -d '\r' | xargs -n1
 }
 
 # device_pick_or_fail [DEVICE]
 device_pick_or_fail() {
     local specified="${1:-}"
+    specified="$(printf '%s' "$specified" | tr -d '\r' | xargs)"
     mapfile -t devs < <(device_list_connected)
     if [[ -n "$specified" ]]; then
         if printf '%s\n' "${devs[@]}" | grep -Fxq "$specified"; then
@@ -68,6 +69,41 @@ device_pick_or_fail() {
         die "$E_MULTI_DEVICE" "Multiple devices detected; use --device"
     fi
     echo "${devs[0]}"
+}
+
+# Print first 'device' serial, trimmed; rc 1=no device, 2=multi, 3=unauthorized
+get_normalized_serial() {
+    local line serial state
+    local -a devs
+    while read -r line; do
+        serial="${line%%[[:space:]]*}"
+        state="${line##*$serial}"
+        state="${state##*[[:space:]]}"
+        case "$state" in
+            device)
+                devs+=("$(printf '%s' "$serial" | tr -d '\r' | xargs)")
+                ;;
+            unauthorized)
+                printf '[ERR] device %q unauthorized\n' "$serial" >&2
+                return 3
+                ;;
+        esac
+    done < <(adb devices | tail -n +2)
+    if (( ${#devs[@]} == 0 )); then
+        return 1
+    elif (( ${#devs[@]} > 1 )); then
+        return 2
+    fi
+    printf '%s\n' "${devs[0]}"
+}
+
+# Ensure device is in state "device"
+assert_device_ready() {
+    local s="$1"
+    adb -s "$s" get-state 1>/dev/null || {
+        echo "[ERR] device '$s' not ready (need state=device)." >&2
+        return 1
+    }
 }
 
 # adb wrapper that logs on failure but does not exit

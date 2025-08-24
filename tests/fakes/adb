@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mode="${FAKE_ADB_SCENARIO:-good}"
+
+if [[ "$1" == "devices" ]]; then
+  case "$mode" in
+    good)
+      printf 'List of devices attached\nZY22JK89DR \tdevice\n'
+      ;;
+    crlf)
+      printf 'List of devices attached\nZY22JK89DR\r\tdevice\n'
+      ;;
+    multi)
+      printf 'List of devices attached\nZY22JK89DR \tdevice\nABCDEF0123456789\tdevice\n'
+      ;;
+    unauthorized)
+      printf 'List of devices attached\nZY22JK89DR\tunauthorized\n'
+      ;;
+    *)
+      printf 'List of devices attached\n\n'
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "$1" == "-s" ]]; then
+  shift
+  serial="$1"; shift
+  cmd="$1"; shift || true
+  if [[ "$cmd" == "get-state" ]]; then
+    if [[ "$serial" == "ZY22JK89DR" ]]; then
+      echo "device"
+      exit 0
+    fi
+    echo "unknown"
+    exit 1
+  fi
+  if [[ "$cmd" == "shell" ]]; then
+    if [[ "$1" == "pm" && "$2" == "path" ]]; then
+      echo "package:/data/app/com.zhiliaoapp.musically-1/base.apk"
+      exit 0
+    fi
+    if [[ "$1" == "echo" && "$2" == "OK" ]]; then
+      echo "OK"
+      exit 0
+    fi
+    exit 0
+  fi
+  if [[ "$cmd" == "pull" ]]; then
+    dst="${@: -1}"
+    mkdir -p "$(dirname "$dst")"
+    echo "dummy" >"$dst"
+    exit 0
+  fi
+fi
+
+if [[ "$1" == "get-state" ]]; then
+  echo "device"
+  exit 0
+fi
+
+exit 0

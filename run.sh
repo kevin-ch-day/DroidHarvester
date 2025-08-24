@@ -61,12 +61,16 @@ log_file_init "$LOG_FILE"
 check_dependencies
 
 if [[ -n "$DEVICE" ]]; then
+    DEVICE="$(printf '%s' "$DEVICE" | tr -d '\r' | xargs)"
     DEVICE="$(device_pick_or_fail "$DEVICE")"
 else
     mapfile -t _devs < <(device_list_connected)
     if (( ${#_devs[@]} == 1 )); then
         DEVICE="${_devs[0]}"
     fi
+fi
+if [[ -n "$DEVICE" ]]; then
+    assert_device_ready "$DEVICE" || DEVICE=""
 fi
 
 init_session
