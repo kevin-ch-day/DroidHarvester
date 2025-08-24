@@ -49,7 +49,7 @@ done
 
 # Actions
 # shellcheck disable=SC1090
-for action in choose_device scan_apps add_custom_package harvest list_apps search_apps view_report export_bundle resume cleanup; do
+for action in choose_device scan_apps add_custom_package harvest list_apps search_apps capability_report view_report export_bundle resume cleanup; do
     # shellcheck disable=SC1090
     source "$REPO_ROOT/lib/actions/$action.sh"
 done
@@ -108,11 +108,12 @@ while true; do
         "View last report" \
         "List ALL installed apps" \
         "Search installed apps" \
+        "Device capability report" \
         "Export report bundle" \
         "Resume last session" \
         "Clean up partial run" \
         "Exit"
-    choice=$(read_choice 11)
+    choice=$(read_choice 12)
 
     case $choice in
         1) choose_device ;;
@@ -122,10 +123,11 @@ while true; do
         5) view_report ;;
         6) list_installed_apps ;;
         7) search_installed_apps ;;
-        8) export_report ;;
-        9) resume_last_session ;;
-        10) cleanup_partial_run ;;
-        11) LOG_COMP="core" log INFO "Exiting DroidHarvester."; exit 0 ;;
+        8) capability_report ;;
+        9) export_report ;;
+        10) resume_last_session ;;
+        11) cleanup_partial_run ;;
+        12) LOG_COMP="core" log INFO "Exiting DroidHarvester."; exit 0 ;;
     esac
 
     draw_menu_footer

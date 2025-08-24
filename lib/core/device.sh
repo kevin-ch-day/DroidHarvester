@@ -13,10 +13,10 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO" >&2' ERR
 : "${DH_PULL_TIMEOUT:=60}"
 : "${DH_SHELL_TIMEOUT:=15}"
 
-# Refresh ADB_FLAGS whenever DEVICE is set
+# Refresh ADB_ARGS whenever DEVICE is set
 update_adb_flags() {
-    ADB_FLAGS="-s $DEVICE"
-    export ADB_FLAGS
+    ADB_ARGS=(-s "$DEVICE")
+    export ADB_ARGS
 }
 
 # Normalize a serial by stripping CR and surrounding whitespace
@@ -41,8 +41,8 @@ set_device() {
 
 adb_healthcheck() {
     LOG_COMP="adb" log INFO "adb get-state" && adb get-state >/dev/null 2>&1 || true
-    LOG_COMP="adb" log INFO "adb $ADB_FLAGS shell echo OK" && adb $ADB_FLAGS shell echo OK >/dev/null 2>&1 || true
-    LOG_COMP="adb" log INFO "device df" && adb $ADB_FLAGS shell df -h /data >/dev/null 2>&1 || true
+    LOG_COMP="adb" log INFO "adb ${ADB_ARGS[*]} shell echo OK" && adb "${ADB_ARGS[@]}" shell echo OK >/dev/null 2>&1 || true
+    LOG_COMP="adb" log INFO "device df" && adb "${ADB_ARGS[@]}" shell df -h /data >/dev/null 2>&1 || true
     LOG_COMP="host" log INFO "host df" && df -h . || true
 }
 
@@ -59,7 +59,7 @@ adb_retry() {
     local attempt=0 rc=0 start end dur
     start=$(date +%s%3N)
     while (( attempt < max )); do
-        with_trace "$label" -- timeout --preserve-status -- "$timeout" adb $ADB_FLAGS "${cmd[@]}" && { rc=0; break; }
+        with_trace "$label" -- timeout --preserve-status -- "$timeout" adb "${ADB_ARGS[@]}" "${cmd[@]}" && { rc=0; break; }
         rc=$?
         attempt=$((attempt+1))
         (( attempt < max )) && sleep "$backoff"
@@ -82,7 +82,7 @@ adb_get_state() {
     if [[ $# -gt 0 ]]; then
         adb -s "$1" get-state
     else
-        adb $ADB_FLAGS get-state
+        adb "${ADB_ARGS[@]}" get-state
     fi
 }
 

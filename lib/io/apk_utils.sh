@@ -77,12 +77,68 @@ apk_split_role() {
 # Compute output dir/file and role for a given pkg + source path
 # Returns NUL-separated triplet: outdir\0outfile\0role
 compute_outfile_vars() {
-  local pkg="$1" apk_path="$2" safe; safe="$(safe_apk_name "$apk_path")"
+  local pkg="$1" apk_path="$2"
   local root="${3:-${DEVICE_DIR:-.}}"
-  local outdir="$root/$pkg/${safe%.apk}"
-  local outfile="$outdir/$safe"
+  local base="$(basename -- "$apk_path")"
+  base="$(safe_apk_name "$base")"
+  local split_name="${base%.apk}"
+  local outdir="$root/$pkg/$split_name"
+  local outfile="$outdir/$base"
   local role; role="$(apk_split_role "$apk_path")"
-  printf '%s\0%s\0%s' "$outdir" "$outfile" "$role"
+  printf '%s\0%s\0%s\0' "$outdir" "$outfile" "$role"
+}
+
+# Decide how to access APK paths for a package.
+# Echoes one of: direct|run-as|su; returns 1 if none viable.
+determine_pull_strategy() {
+  local pkg="$1" sample="$2"
+  if adb_shell dd if="$sample" of=/dev/null bs=1 count=1 >/dev/null 2>&1; then
+    LOG_PKG="$pkg" log DEBUG "strategy=direct"
+    echo direct
+    return 0
+  fi
+  if adb_shell run-as "$pkg" id >/dev/null 2>&1; then
+    LOG_PKG="$pkg" log DEBUG "strategy=run-as"
+    echo run-as
+    return 0
+  fi
+  if adb_shell su 0 id >/dev/null 2>&1; then
+    LOG_PKG="$pkg" log DEBUG "strategy=su"
+    echo su
+    return 0
+  fi
+  LOG_PKG="$pkg" log DEBUG "strategy=none"
+  return 1
+}
+
+pull_with_strategy() {
+  local strategy="$1" pkg="$2" src="$3" dest="$4"
+  case "$strategy" in
+    direct)
+      run_adb_pull_with_fallbacks "$src" "$dest"
+      ;;
+    run-as)
+      local tmp="/data/local/tmp/$(basename "$dest")"
+      if adb_shell run-as "$pkg" cp "$src" "$tmp" >/dev/null 2>&1; then
+        run_adb_pull_with_fallbacks "$tmp" "$dest"
+        adb_shell run-as "$pkg" rm -f "$tmp" >/dev/null 2>&1 || true
+      else
+        return 1
+      fi
+      ;;
+    su)
+      local tmp="/data/local/tmp/$(basename "$dest")"
+      if adb_shell su 0 cp "$src" "$tmp" >/dev/null 2>&1; then
+        run_adb_pull_with_fallbacks "$tmp" "$dest"
+        adb_shell su 0 rm -f "$tmp" >/dev/null 2>&1 || true
+      else
+        return 1
+      fi
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 # --- pm list / pm path helpers ------------------------------------------------
@@ -102,7 +158,7 @@ _pm_path_run() {
       ;;
     C)
       with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
-        adb $ADB_FLAGS shell pm path "$pkg" 2>/dev/null
+      adb "${ADB_ARGS[@]}" shell pm path "$pkg" 2>/dev/null
       ;;
     *) return 127 ;;
   esac
@@ -169,7 +225,7 @@ apk_paths_verify() {
   local line
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    if adb $ADB_FLAGS shell test -f "$line" 2>/dev/null; then
+    if adb "${ADB_ARGS[@]}" shell test -f "$line" 2>/dev/null; then
       printf '%s\tOK\n' "$line"
     else
       printf '%s\tMISSING\n' "$line"
@@ -182,19 +238,16 @@ apk_paths_verify() {
 # Try to compute SHA256 on device for a given ABS path; echoes hash or nothing
 device_sha256() {
   local path="$1" out rc
-  # Try common variants (toybox, busybox, coreutils)
-  out=$( 
+  out=$(
     adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
-        shell 'command -v sha256sum >/dev/null 2>&1 && sha256sum "$0" || (command -v toybox >/dev/null 2>&1 && toybox sha256sum "$0")' "$path" 2>/dev/null
+      shell 'command -v sha256sum >/dev/null 2>&1 && sha256sum "$1" || (command -v toybox >/dev/null 2>&1 && toybox sha256sum "$1")' _ "$path" 2>/dev/null
   ); rc=$?
   if (( rc != 0 )) || [[ -z "${out:-}" ]]; then
-    # Fallback: some builds output just hash or "hash  filename"
-    out=$( 
+    out=$(
       adb_retry "$DH_SHELL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" sha_dev -- \
-          shell sha256sum "$path" 2>/dev/null
+        shell sha256sum "$path" 2>/dev/null
     ) || true
   fi
-  # Normalize to first field
   printf '%s\n' "$out" | awk '{print $1}' | head -n1
 }
 
@@ -207,41 +260,23 @@ file_sha256() {
 
 # --- pull helpers -------------------------------------------------------------
 
-# Variant runner: try pull using (A) retry w/ label, (B) retry w/o label, (C) direct
-_adb_pull_run() {
-  local variant="$1" src="$2" dst="$3"
-  case "$variant" in
-    A)
-      adb_retry "$DH_PULL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" adb_pull -- \
-          pull "$src" "$dst"
-      ;;
-    B)
-      adb_retry "$DH_PULL_TIMEOUT" "$DH_RETRIES" "$DH_BACKOFF" '' -- \
-          pull "$src" "$dst"
-      ;;
-    C)
-      with_timeout "$DH_PULL_TIMEOUT" adb_pull -- \
-        adb $ADB_FLAGS pull "$src" "$dst"
-      ;;
-    *) return 127 ;;
-  esac
-}
-
-# Tries A→B→C; returns final rc (no stdout)
+# Pull with retry, falling back to device-side copy on permission errors
 run_adb_pull_with_fallbacks() {
   local src="$1" dst="$2" rc tmp
   local __old_err_trap; __old_err_trap="$(trap -p ERR || true)"
   trap - ERR
   set +e
 
-  _adb_pull_run A "$src" "$dst"; rc=$?
-  if (( rc != 0 )); then _adb_pull_run B "$src" "$dst"; rc=$?; fi
-  if (( rc != 0 )); then _adb_pull_run C "$src" "$dst"; rc=$?; fi
+  log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $src $dst"
+  timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$src" "$dst" >>"$LOGFILE" 2>&1
+  rc=$?
   if (( rc != 0 )); then
     LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying copy fallback"
     tmp="/data/local/tmp/$(basename "$dst")"
     if adb_shell cp "$src" "$tmp" >/dev/null 2>&1; then
-      _adb_pull_run A "$tmp" "$dst"; rc=$?
+      log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $tmp $dst"
+      timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$tmp" "$dst" >>"$LOGFILE" 2>&1
+      rc=$?
       adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
     else
       LOG_APK="$(basename "$dst")" log WARN "device-side copy failed"
@@ -258,7 +293,9 @@ run_adb_pull_with_fallbacks() {
 # Prints destination file path on success.
 apk_pull_one() {
   local pkg="$1" src_path="$2" dest_root="${3:-${DEVICE_DIR:-.}}"
-  IFS=$'\0' read -r outdir outfile role < <(compute_outfile_vars "$pkg" "$src_path" "$dest_root")
+  local parts
+  readarray -d '' -t parts < <(compute_outfile_vars "$pkg" "$src_path" "$dest_root")
+  local outdir="${parts[0]}" outfile="${parts[1]}" role="${parts[2]}"
   [[ "$DH_DRY_RUN" == "1" ]] && { printf '%s\n' "$outfile"; return 0; }
   mkdir -p -- "$outdir"
 
@@ -275,7 +312,7 @@ apk_pull_one() {
   fi
 
   LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Pulling ($(apk_install_partition "$src_path") / $(apk_split_role "$src_path"))"
-  if ! run_adb_pull_with_fallbacks "$src_path" "$outfile"; then
+  if ! pull_with_strategy "${APK_PULL_STRATEGY:-direct}" "$pkg" "$src_path" "$outfile"; then
     LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log ERROR "Pull failed"
     return 1
   fi
@@ -314,6 +351,13 @@ apk_pull_all_for_package() {
     return 1
   fi
 
+  local sample
+  sample="$(printf '%s\n' "$paths" | head -n1)"
+  if ! APK_PULL_STRATEGY="$(determine_pull_strategy "$pkg" "$sample" 2>/dev/null)"; then
+    LOG_PKG="$pkg" log ERROR "APKs not readable on device (no direct read, no run-as, no root)"
+    return 1
+  fi
+
   while IFS= read -r p; do
     [[ -z "$p" ]] && continue
     local role; role="$(apk_split_role "$p")"
@@ -323,7 +367,7 @@ apk_pull_all_for_package() {
     fi
     if fpath="$(apk_pull_one "$pkg" "$p" "$dest_root")"; then
       printf '%s\n' "$fpath"
-      ((pulled++))
+      pulled=$((pulled+1))
     else
       LOG_PKG="$pkg" LOG_APK="$p" log WARN "pull failed (continuing)"
     fi

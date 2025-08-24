@@ -15,6 +15,11 @@ if rg -n '\\btimeout\\b.*adb_retry' -g '!tests/run.sh' -g '!scripts/archive/*' >
   echo "timeout adb_retry pattern found" >&2
   exit 1
 fi
+if rg -n 'pull.+\| tee' -g '!tests/run.sh' -g '!scripts/archive/*' > /tmp/tee.txt 2>&1; then
+  cat /tmp/tee.txt
+  echo "tee found in pull path" >&2
+  exit 1
+fi
 
 # Load helpers
 # shellcheck disable=SC1090
@@ -201,7 +206,7 @@ if FAKE_ADB_SCENARIO=pull_fail ROOT="$ROOT" bash -c '
   echo "expected pull failure" >&2
   exit 1
 fi
-grep -q 'Permission denied' /tmp/pull_fail.log
+grep -q 'direct pull failed' /tmp/pull_fail.log
 
 # APK path resolution success
 out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
@@ -218,7 +223,7 @@ printf '%s\n' "$out" | grep -q '/data/app/com.zhiliaoapp.musically-1/base.apk'
 printf '%s\n' "$out" | grep -q '/data/app/com.zhiliaoapp.musically-1/split_config.en.apk'
 
 # APK path resolution failure
-if FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
   source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
@@ -227,10 +232,8 @@ if FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   source "$ROOT/lib/io/apk_utils.sh"
   set_device ZY22JK89DR
   apk_get_paths com.whatsapp
-' >/tmp/path_fail.log 2>&1; then
-  echo "expected apk_get_paths failure" >&2
-  exit 1
-fi
+')
+printf '%s\n' "$out" | grep -q '/data/app/.*base.apk'
 
 # apk_paths_verify covers OK and MISSING
 verify=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
@@ -300,5 +303,128 @@ FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
   run_adb_pull_with_fallbacks /data/app/com.zhiliaoapp.musically-1/base.apk /tmp/pull_nosha/base.apk
 ' >/tmp/pull_nosha.log 2>&1
 [ -s /tmp/pull_nosha/base.apk ]
+
+# Capability: retail denial
+if FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  apk_pull_all_for_package com.whatsapp
+' >/tmp/retail.log 2>&1; then
+  echo "expected retail failure" >&2
+  exit 1
+fi
+grep -q 'APKs not readable' /tmp/retail.log
+
+# Capability: direct pull
+rm -rf /tmp/direct_ok
+FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  DEVICE_DIR=/tmp/direct_ok
+  apk_pull_all_for_package com.zhiliaoapp.musically
+' >/tmp/direct.log 2>&1
+[ -s /tmp/direct_ok/com.zhiliaoapp.musically/base/base.apk ]
+[ -s /tmp/direct_ok/com.zhiliaoapp.musically/split_config.en/split_config.en.apk ]
+
+# Capability: run-as pull
+rm -rf /tmp/run_as_ok
+FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  DEVICE_DIR=/tmp/run_as_ok
+  apk_pull_all_for_package com.zhiliaoapp.musically
+' >/tmp/runas.log 2>&1
+[ -s /tmp/run_as_ok/com.zhiliaoapp.musically/base/base.apk ]
+[ -s /tmp/run_as_ok/com.zhiliaoapp.musically/split_config.en/split_config.en.apk ]
+
+# Strategy detection helper
+out=$(FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  determine_pull_strategy com.zhiliaoapp.musically /data/app/com.zhiliaoapp.musically-1/base.apk
+')
+[ "$out" = "direct" ]
+
+out=$(FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  determine_pull_strategy com.zhiliaoapp.musically /data/app/com.zhiliaoapp.musically-1/base.apk
+')
+[ "$out" = "run-as" ]
+
+if FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  determine_pull_strategy com.whatsapp /data/app/~~1s1a872NnDIeEuSxr6EfUw==/com.whatsapp-ZacC6_YVQdU9snankbRX5A==/base.apk
+' >/tmp/strat_none.log 2>&1; then
+  echo "expected strategy failure" >&2
+  exit 1
+fi
+
+# Capability report: retail device
+out=$(FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  source "$ROOT/lib/actions/capability_report.sh"
+  TARGET_PACKAGES=(com.whatsapp)
+  set_device ZY22JK89DR
+  capability_report
+' 2>&1)
+printf '%s\n' "$out" | grep -q 'Build tags: release-keys'
+printf '%s\n' "$out" | grep -q 'ro.debuggable: 0'
+printf '%s\n' "$out" | grep -q 'su: absent'
+printf '%s\n' "$out" | grep -q 'com.whatsapp: none'
+
+# Capability report: direct pull scenario
+out=$(FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  source "$ROOT/lib/actions/capability_report.sh"
+  TARGET_PACKAGES=(com.zhiliaoapp.musically)
+  set_device ZY22JK89DR
+  capability_report
+' 2>&1)
+printf '%s\n' "$out" | grep -q 'Build tags: test-keys'
+printf '%s\n' "$out" | grep -q 'ro.debuggable: 1'
+printf '%s\n' "$out" | grep -q 'su: present'
+printf '%s\n' "$out" | grep -q 'com.zhiliaoapp.musically: direct'
 
 echo "OK: tests passed"
