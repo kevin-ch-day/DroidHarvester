@@ -71,6 +71,18 @@ FAKE_ADB_SCENARIO=good DH_DRY_RUN=1 "$ROOT/scripts/adb_health.sh" >/dev/null
 # Scan success (plain pm list)
 out=$(FAKE_ADB_SCENARIO=good adb -s ZY22JK89DR shell pm list packages)
 printf '%s\n' "$out" | grep -q 'package:com.zhiliaoapp.musically'
+# Grep positive case
+out=$(FAKE_ADB_SCENARIO=good adb -s ZY22JK89DR shell pm list packages | grep -Ei 'tiktok|aweme|trill|musically|bytedance')
+printf '%s\n' "$out" | grep -q 'musically'
+
+# Grep negative case
+if FAKE_ADB_SCENARIO=good adb -s ZY22JK89DR shell pm list packages | grep -Ei 'notarealpackage' >/tmp/grep_empty.txt; then
+  echo "expected empty grep" >&2
+  exit 1
+fi
+[ ! -s /tmp/grep_empty.txt ]
+
+
 
 # Scan success via wrapper (mirrors menu path)
 set_device ZY22JK89DR
@@ -190,5 +202,103 @@ if FAKE_ADB_SCENARIO=pull_fail ROOT="$ROOT" bash -c '
   exit 1
 fi
 grep -q 'Permission denied' /tmp/pull_fail.log
+
+# APK path resolution success
+out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  apk_get_paths com.zhiliaoapp.musically
+')
+printf '%s\n' "$out" | grep -q '/data/app/com.zhiliaoapp.musically-1/base.apk'
+printf '%s\n' "$out" | grep -q '/data/app/com.zhiliaoapp.musically-1/split_config.en.apk'
+
+# APK path resolution failure
+if FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  apk_get_paths com.whatsapp
+' >/tmp/path_fail.log 2>&1; then
+  echo "expected apk_get_paths failure" >&2
+  exit 1
+fi
+
+# apk_paths_verify covers OK and MISSING
+verify=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  printf "/data/app/com.zhiliaoapp.musically-1/base.apk\n/data/app/doesnotexist.apk\n" | apk_paths_verify
+')
+printf '%s\n' "$verify" | grep -q $'/data/app/com.zhiliaoapp.musically-1/base.apk\tOK'
+printf '%s\n' "$verify" | grep -q $'/data/app/doesnotexist.apk\tMISSING'
+
+# Third-party package listing
+out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  apk_list_third_party
+')
+printf '%s\n' "$out" | grep -q '^com.zhiliaoapp.musically$'
+printf '%s\n' "$out" | grep -q '^com.example.app$'
+
+# device-side hashing
+hash=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  device_sha256 /data/app/com.zhiliaoapp.musically-1/base.apk
+')
+[ "$hash" = "161e286b4118f3d163973f551caf1de560888fa9196f767023c6ae40fe792e50" ]
+
+# device-side hashing absent should yield empty
+hash=$(FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  device_sha256 /data/app/com.zhiliaoapp.musically-1/base.apk || true
+')
+hash=$(printf '%s' "$hash")
+[ -z "$hash" ]
+
+# Pull without sha256sum should still succeed
+rm -rf /tmp/pull_nosha
+FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
+  set -euo pipefail
+  PATH="$ROOT/tests/fakes:$PATH"
+  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/core/trace.sh"
+  source "$ROOT/lib/core/device.sh"
+  source "$ROOT/lib/io/apk_utils.sh"
+  set_device ZY22JK89DR
+  run_adb_pull_with_fallbacks /data/app/com.zhiliaoapp.musically-1/base.apk /tmp/pull_nosha/base.apk
+' >/tmp/pull_nosha.log 2>&1
+[ -s /tmp/pull_nosha/base.apk ]
 
 echo "OK: tests passed"

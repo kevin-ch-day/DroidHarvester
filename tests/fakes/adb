@@ -1,176 +1,231 @@
 #!/usr/bin/env bash
-# Fake ADB shim for tests. Select behavior via FAKE_ADB_SCENARIO.
-# Scenarios:
-#   good         : one device "ZY22JK89DR " (trailing space) in 'device' state
-#   crlf         : one device with CR in serial to test trimming
-#   multi        : two devices in 'device' state
-#   unauthorized : one device in 'unauthorized' state
-#   list_fail    : pm list packages fails
-#   pull_perm    : pull only allowed from /data/local/tmp (simulates prod perms)
-#   pull_fail    : all pulls fail
+# Fake ADB shim that reads fixtures for tests.
+# Behavior selected via FAKE_ADB_SCENARIO env var.
 set -euo pipefail
-mode="${FAKE_ADB_SCENARIO:-good}"
 
-print_devices() {
-  case "$mode" in
-    good|list_fail|pull_perm|pull_fail)
-      # Note the deliberate trailing space before the tab to test trimming
-      printf 'List of devices attached\nZY22JK89DR \tdevice\n'
-      ;;
-    crlf)
-      # Deliberate CR to test CR-stripping
-      printf 'List of devices attached\nZY22JK89DR\r\tdevice\n'
-      ;;
-    multi)
-      printf 'List of devices attached\nZY22JK89DR \tdevice\nABCDEF0123456789\tdevice\n'
-      ;;
-    unauthorized)
-      printf 'List of devices attached\nZY22JK89DR\tunauthorized\n'
-      ;;
-    *)
-      printf 'List of devices attached\n\n'
-      ;;
-  esac
+MODE="${FAKE_ADB_SCENARIO:-good}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FIX="$ROOT/fixtures"
+BASE_FS="$FIX/device_fs"
+RUNTIME_FS="${FAKE_ADB_RUNTIME_FS:-/tmp/fake_device_fs}"
+mkdir -p "$RUNTIME_FS"
+if [[ ! -e "$RUNTIME_FS/.seeded" ]]; then
+  rm -rf "$RUNTIME_FS"
+  cp -a "$BASE_FS" "$RUNTIME_FS"
+  touch "$RUNTIME_FS/.seeded"
+fi
+
+fixture() {
+  local name="$1"
+  local path="$FIX/$name"
+  [[ -f "$path" ]] || return 1
+  cat "$path"
 }
 
-# adb devices (and adb devices -l)
+copy_from_device() {
+  local src="$1" dst="$2"
+  local abs_src="$RUNTIME_FS${src}"
+  if [[ -f "$abs_src" ]]; then
+    mkdir -p "$(dirname "$dst")"
+    cp "$abs_src" "$dst"
+    return 0
+  fi
+  return 1
+}
+
+copy_on_device() {
+  local src="$1" dst="$2"
+  local abs_src="$RUNTIME_FS${src}"
+  local abs_dst="$RUNTIME_FS${dst}"
+  mkdir -p "$(dirname "$abs_dst")"
+  cp "$abs_src" "$abs_dst"
+}
+
+remove_on_device() {
+  local path="$1"
+  rm -f "$RUNTIME_FS${path}"
+}
+
+# adb devices (and devices -l)
 if [[ "${1:-}" == "devices" ]]; then
-  print_devices
+  if [[ "${2:-}" == "-l" ]]; then
+    fixture "adb_devices_l_${MODE}.txt" || fixture "adb_devices_l_good.txt"
+  else
+    fixture "adb_devices_${MODE}.txt" || fixture "adb_devices_good.txt"
+  fi
   exit 0
 fi
 
-# Top-level get-state without -s (some scripts do this)
+# top-level get-state
 if [[ "${1:-}" == "get-state" ]]; then
-  echo "device"
+  fixture "get_state_device.txt" || echo device
   exit 0
 fi
 
-# Handle "-s <serial> <cmd> ..."
+# handle -s SERIAL CMD ...
 if [[ "${1:-}" == "-s" ]]; then
   shift
   serial="${1:-}"; shift || true
-  cmd="${1:-}";    shift || true
+  cmd="${1:-}"; shift || true
 
   case "$cmd" in
     get-state)
-      if [[ "${serial% }" == "ZY22JK89DR" ]]; then
-        echo "device"; exit 0
-      fi
-      echo "unknown"; exit 1
+      fixture "get_state_device.txt" || echo device
+      exit 0
       ;;
-
-
     shell)
-      # Reconstruct remaining shell args
       sub="${1:-}"; shift || true
+      if [[ "$MODE" == "nosha" && "$sub" == command\ -v\ sha256sum* ]]; then
+        exit 1
+      fi
       case "$sub" in
         echo)
-          # e.g. adb -s ... shell echo OK
-          if [[ "${1:-}" == "OK" ]]; then echo "OK"; fi
+          if [[ "${1:-}" == "OK" ]]; then fixture "echo_OK.txt" || echo OK; fi
           exit 0
           ;;
-
         df)
-          # Minimal df output for health checks
-          cat <<'EOF'
-Filesystem       Size Used Avail Use% Mounted on
-/dev/block/dm-50 110G  15G   96G  14% /storage/emulated/0/Android/obb
-EOF
-          exit 0
+          if [[ "${1:-}" == "-h" && "${2:-}" == "/data" ]]; then
+            fixture "df_h_data.txt" && exit 0
+          fi
           ;;
-
         pm)
           sub2="${1:-}"; shift || true
           case "$sub2" in
-            path)
-              # Return at least one APK path
-              pkg="${1:-com.zhiliaoapp.musically}"
-              echo "package:/data/app/~~GiOQmESL3HTbor5kPLWnoQ==/${pkg}-1/base.apk"
-              # Optionally more splits could be added here if needed by tests
-              exit 0
-              ;;
             list)
-              # e.g. pm list packages  OR  pm list packages -f -3
-              # Fail if scenario dictates; otherwise return a small set
-              if [[ "$mode" == "list_fail" ]]; then
-                echo "cmd: failure" >&2
+              if [[ "$MODE" == "list_fail" ]]; then
+                fixture "pm_list_fail.txt" >&2
                 exit 1
               fi
-              # Basic responses for both plain and "-f -3"
               if [[ "${1:-}" == "packages" ]]; then
                 if [[ "${2:-}" == "-f" && "${3:-}" == "-3" ]]; then
-                  echo "package:/data/app/~~GiOQmESL3HTbor5kPLWnoQ==/com.zhiliaoapp.musically-1/base.apk=com.zhiliaoapp.musically"
-                else
-                  echo "package:com.zhiliaoapp.musically"
+                  fixture "pm_list_f_3.txt" && exit 0
+                elif [[ "${2:-}" == "-3" ]]; then
+                  fixture "pm_list_3.txt" && exit 0
                 fi
-                exit 0
+                fixture "pm_list_all.txt" && exit 0
               fi
-              echo "package:com.zhiliaoapp.musically"
-              exit 0
+              ;;
+            path)
+              pkg="${1:-}"
+              file="pm_path_${pkg//./_}.txt"
+              if fixture "$file"; then
+                [[ -s "$FIX/$file" ]] && exit 0
+              fi
+              exit 1
               ;;
           esac
           ;;
-
-        cp)
-          # Simulate copy-to-tmp step sometimes used before pull
-          # Allow in pull_perm mode only when dest is /data/local/tmp/*
-          # Accept and succeed for simplicity otherwise.
-          src="${1:-}"; dst="${2:-}"
-          if [[ "$mode" == "pull_perm" ]]; then
-            [[ "$dst" == /data/local/tmp/* ]] && exit 0
+        dumpsys)
+          if [[ "${1:-}" == "package" ]]; then
+            pkg="${2:-}"
+            file="dumpsys_${pkg//./_}.txt"
+            if fixture "$file"; then
+              exit 0
+            fi
             exit 1
           fi
-          exit 0
           ;;
-
+        test)
+          if [[ "${1:-}" == "-f" ]]; then
+            path="${2:-}"
+            [[ -f "$RUNTIME_FS${path}" ]]
+            exit $?
+          fi
+          ;;
+        stat)
+          if [[ "${1:-}" == "-c" && "${2:-}" == "%s" ]]; then
+            path="${3:-}"
+            if [[ -f "$RUNTIME_FS${path}" ]]; then
+              stat -c %s "$RUNTIME_FS${path}"
+              exit 0
+            fi
+            exit 1
+          fi
+          ;;
+        toybox)
+          subtoy="${1:-}"; shift || true
+          case "$subtoy" in
+            stat)
+              if [[ "${1:-}" == "-c" && "${2:-}" == "%s" ]]; then
+                path="${3:-}"
+                if [[ -f "$RUNTIME_FS${path}" ]]; then
+                  stat -c %s "$RUNTIME_FS${path}"
+                  exit 0
+                fi
+                exit 1
+              fi
+              ;;
+            sha256sum)
+              path="${1:-}"
+              if [[ "$MODE" == "nosha" ]]; then
+                exit 127
+              fi
+              if [[ -f "$RUNTIME_FS${path}" ]]; then
+                sha256sum "$RUNTIME_FS${path}"
+                exit 0
+              fi
+              exit 1
+              ;;
+          esac
+          ;;
+        sha256sum)
+          path="${1:-}"
+          if [[ "$MODE" == "nosha" ]]; then
+            exit 127
+          fi
+          if [[ -f "$RUNTIME_FS${path}" ]]; then
+            sha256sum "$RUNTIME_FS${path}"
+            exit 0
+          fi
+          exit 1
+          ;;
+        cp)
+          src="${1:-}"; dst="${2:-}"
+          if [[ "$MODE" == "pull_perm" && "$dst" != /data/local/tmp/* ]]; then
+            exit 1
+          fi
+          copy_on_device "$src" "$dst" && exit 0 || exit 1
+          ;;
         rm)
-          # Always succeed
+          path="${1:-}"
+          remove_on_device "$path"
           exit 0
           ;;
-
-        *)
-          # Default success for other shell subcommands
-          exit 0
+        'id;')
+          if [[ "${1:-}" == "whoami;" && "${2:-}" == "getprop" && "${3:-}" == "ro.build.version.release" ]]; then
+            fixture "id_whoami_getprop.txt"
+            exit 0
+          fi
           ;;
       esac
+      exit 0
       ;;
-
     pull)
-      # Simulate adb pull SRC [DST|DIR]
-      # Treat the last arg as the destination path.
-      # In success cases, create the destination and write a dummy file.
       args=("$@")
       src="${args[0]:-}"
       dst="${args[-1]:-}"
-      mkdir -p "$(dirname "$dst")"
-
-      case "$mode" in
-        pull_perm)
-          # Only allow pulls from /data/local/tmp/*
-          if [[ "$src" == /data/local/tmp/* ]]; then
-            printf 'dummy\n' >"$dst"
-            exit 0
-          fi
-          echo "Permission denied" >&2
-          exit 1
-          ;;
+      case "$MODE" in
         pull_fail)
           echo "Permission denied" >&2
           exit 1
           ;;
+        pull_perm)
+          if [[ "$src" == /data/local/tmp/* ]]; then
+            copy_from_device "$src" "$dst" && exit 0
+            echo "Permission denied" >&2; exit 1
+          else
+            echo "Permission denied" >&2; exit 1
+          fi
+          ;;
         *)
-          printf 'dummy\n' >"$dst"
-          exit 0
+          copy_from_device "$src" "$dst" && exit 0
+          echo "Permission denied" >&2
+          exit 1
           ;;
       esac
-      ;;
-
-    *)
-      # Unknown subcommand with -s: succeed by default to keep tests simple
-      exit 0
       ;;
   esac
 fi
 
-# Default success for anything else
+# default success
 exit 0
