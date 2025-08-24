@@ -104,7 +104,7 @@ _pm_path_run() {
       ;;
     C)
       with_timeout "$DH_SHELL_TIMEOUT" pm_path -- \
-        adb -s "$DEVICE" shell pm path "$pkg" 2>/dev/null
+        adb $ADB_FLAGS shell pm path "$pkg" 2>/dev/null
       ;;
     *) return 127 ;;
   esac
@@ -172,7 +172,7 @@ apk_paths_verify() {
   local line
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    if adb -s "$DEVICE" shell test -f "$line" 2>/dev/null; then
+    if adb $ADB_FLAGS shell test -f "$line" 2>/dev/null; then
       printf '%s\tOK\n' "$line"
     else
       printf '%s\tMISSING\n' "$line"
@@ -228,7 +228,7 @@ _adb_pull_run() {
       ;;
     C)
       with_timeout "$DH_PULL_TIMEOUT" adb_pull -- \
-        adb -s "$DEVICE" pull "$src" "$dst"
+        adb $ADB_FLAGS pull "$src" "$dst"
       ;;
     *) return 127 ;;
   esac
@@ -236,7 +236,7 @@ _adb_pull_run() {
 
 # Tries A→B→C; returns final rc (no stdout)
 run_adb_pull_with_fallbacks() {
-  local src="$1" dst="$2" rc
+  local src="$1" dst="$2" rc tmp
   local __old_err_trap; __old_err_trap="$(trap -p ERR || true)"
   trap - ERR
   set +e
@@ -244,6 +244,17 @@ run_adb_pull_with_fallbacks() {
   _adb_pull_run A "$src" "$dst"; rc=$?
   if (( rc != 0 )); then _adb_pull_run B "$src" "$dst"; rc=$?; fi
   if (( rc != 0 )); then _adb_pull_run C "$src" "$dst"; rc=$?; fi
+  if (( rc != 0 )); then
+    LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying copy fallback"
+    tmp="/data/local/tmp/$(basename "$dst")"
+    adb $ADB_FLAGS shell cp "$src" "$tmp" >/dev/null 2>&1
+    if (( $? == 0 )); then
+      _adb_pull_run A "$tmp" "$dst"; rc=$?
+      adb $ADB_FLAGS shell rm -f "$tmp" >/dev/null 2>&1 || true
+    else
+      LOG_APK="$(basename "$dst")" log WARN "device-side copy failed"
+    fi
+  fi
 
   set -e
   [[ -n "$__old_err_trap" ]] && eval "$__old_err_trap" || true
@@ -263,12 +274,6 @@ apk_pull_one() {
     LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Skip existing"
     printf '%s\n' "$outfile"
     return 0
-  fi
-
-  # (Optional) pre-check on device
-  if ! adb -s "$DEVICE" shell test -f "$src_path" 2>/dev/null; then
-    LOG_PKG="$pkg" LOG_APK="$src_path" log WARN "Source APK missing on device"
-    return 1
   fi
 
   # Optional: compute device hash first to avoid re-pulling identical files

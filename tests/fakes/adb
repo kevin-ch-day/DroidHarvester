@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mode="${FAKE_ADB_SCENARIO:-good}"
+
+if [[ "$1" == "devices" ]]; then
+  case "$mode" in
+    good|list_fail|pull_perm|pull_fail)
+      printf 'List of devices attached\nZY22JK89DR \tdevice\n'
+      ;;
+    crlf)
+      printf 'List of devices attached\nZY22JK89DR\r\tdevice\n'
+      ;;
+    multi)
+      printf 'List of devices attached\nZY22JK89DR \tdevice\nABCDEF0123456789\tdevice\n'
+      ;;
+    unauthorized)
+      printf 'List of devices attached\nZY22JK89DR\tunauthorized\n'
+      ;;
+    *)
+      printf 'List of devices attached\n\n'
+      ;;
+  esac
+  exit 0
+fi
+
+if [[ "$1" == "-s" ]]; then
+  shift
+  serial="$1"; shift
+  cmd="$1"; shift || true
+  if [[ "$cmd" == "get-state" ]]; then
+    if [[ "$serial" == "ZY22JK89DR" ]]; then
+      echo "device"
+      exit 0
+    fi
+    echo "unknown"
+    exit 1
+  fi
+  if [[ "$cmd" == "get-transport-id" ]]; then
+    echo "1"
+    exit 0
+  fi
+  if [[ "$cmd" == "shell" ]]; then
+    if [[ "$1" == "pm" && "$2" == "path" ]]; then
+      echo "package:/data/app/com.zhiliaoapp.musically-1/base.apk"
+      exit 0
+    fi
+    if [[ "$1" == "pm" && "$2" == "list" && "$3" == "packages" ]]; then
+      if [[ "$mode" == "list_fail" ]]; then
+        echo "cmd: failure" >&2
+        exit 1
+      fi
+      echo "package:com.zhiliaoapp.musically"
+      exit 0
+    fi
+    if [[ "$1" == "cp" ]]; then
+      if [[ "$mode" == "pull_perm" && "$3" == /data/local/tmp/* ]]; then
+        exit 0
+      fi
+      exit 1
+    fi
+    if [[ "$1" == "rm" ]]; then
+      exit 0
+    fi
+    if [[ "$1" == "echo" && "$2" == "OK" ]]; then
+      echo "OK"
+      exit 0
+    fi
+    exit 0
+  fi
+  if [[ "$cmd" == "pull" ]]; then
+    src="$1"; dst="$2"
+    if [[ "$mode" == "pull_perm" ]]; then
+      if [[ "$src" == /data/local/tmp/* ]]; then
+        mkdir -p "$(dirname "$dst")"
+        echo "dummy" >"$dst"
+        exit 0
+      fi
+      echo "Permission denied" >&2
+      exit 1
+    elif [[ "$mode" == "pull_fail" ]]; then
+      echo "Permission denied" >&2
+      exit 1
+    else
+      mkdir -p "$(dirname "$dst")"
+      echo "dummy" >"$dst"
+      exit 0
+    fi
+  fi
+fi
+
+if [[ "$1" == "get-state" ]]; then
+  echo "device"
+  exit 0
+fi
+
+exit 0

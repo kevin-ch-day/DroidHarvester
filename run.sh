@@ -21,15 +21,6 @@ done
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
-LOG_DIR="$REPO_ROOT/logs"
-mkdir -p "$LOG_DIR"
-if (( CLEAN_LOGS == 1 )); then
-    find "$LOG_DIR" -mindepth 1 -delete 2>/dev/null || true
-else
-    LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
-    find "$LOG_DIR" -type f -mtime +"$LOG_RETENTION_DAYS" -print -delete 2>/dev/null || true
-fi
-
 DEVICE=""
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 DH_DEBUG=${DH_DEBUG:-0}
@@ -55,12 +46,13 @@ for action in choose_device scan_apps add_custom_package harvest list_apps searc
     source "$REPO_ROOT/lib/actions/$action.sh"
 done
 
-LOG_FILE="$LOG_DIR/harvest_log_$(date +%Y%m%d_%H%M%S).txt"
-log_file_init "$LOG_FILE"
+init_session
+log_file_init "$LOGFILE"
 
 check_dependencies
 
 if [[ -n "$DEVICE" ]]; then
+    DEVICE="$(printf '%s' "$DEVICE" | tr -d '\r' | xargs)"
     DEVICE="$(device_pick_or_fail "$DEVICE")"
 else
     mapfile -t _devs < <(device_list_connected)
@@ -68,12 +60,15 @@ else
         DEVICE="${_devs[0]}"
     fi
 fi
+if [[ -n "$DEVICE" ]]; then
+    assert_device_ready "$DEVICE" || DEVICE=""
+    update_adb_flags
+fi
 
-init_session
 session_metadata
 
 if [[ $DH_DEBUG -eq 1 ]]; then
-    enable_xtrace_to_file "$LOG_DIR/trace_$TIMESTAMP.log"
+    enable_xtrace_to_file "$LOGS_DIR/trace_$TIMESTAMP.log"
 fi
 
 while true; do

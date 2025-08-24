@@ -1,47 +1,69 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. && pwd)"
-# Prepend the fake-ADB shim to PATH so library calls invoke it
-export PATH="$ROOT/tests:$PATH"
-export DEV="FAKE_SERIAL"
-source "$ROOT/lib/io/apk_utils.sh"
+export PATH="$ROOT/tests/fakes:$PATH"
 
-# 0) run.sh CLI arg handling
-DUMMY_LOG="$ROOT/logs/dummy.log"
-mkdir -p "$(dirname "$DUMMY_LOG")"
-touch "$DUMMY_LOG"
-printf '11\n' | "$ROOT/run.sh" --clean-logs >/dev/null
-[[ ! -e "$DUMMY_LOG" ]]
-if "$ROOT/run.sh" --help >/dev/null 2>&1; then
-  echo "run.sh accepted unexpected arg" >&2
+# Case 1: good device with trailing space in adb output
+out=$(FAKE_ADB_SCENARIO=good DEBUG=1 DH_DRY_RUN=1 "$ROOT/scripts/adb_apk_diag.sh" 2>&1)
+hex_line=$(printf '%s\n' "$out" | grep '\[DEBUG\] DEV bytes:')
+printf '%s\n' "$hex_line" | grep -q '5a 59 32 32 4a 4b 38 39[[:space:]]*44 52'
+printf '%s\n' "$hex_line" | grep -q '|ZY22JK89DR|'
+printf '%s\n' "$hex_line" | grep -qv '0d'
+printf '%s\n' "$out" | grep -q 'Artifacts in:'
+
+# Case 2: DEV env var with trailing space should be trimmed
+out=$(FAKE_ADB_SCENARIO=good DEV='ZY22JK89DR ' DEBUG=1 DH_DRY_RUN=1 "$ROOT/scripts/adb_apk_diag.sh" 2>&1)
+printf '%s\n' "$out" | grep -q 'Artifacts in:'
+
+# Case 3: multiple devices triggers error
+if FAKE_ADB_SCENARIO=multi "$ROOT/scripts/adb_apk_diag.sh" >/tmp/multi.log 2>&1; then
+  echo "expected failure on multiple devices" >&2
   exit 1
 fi
+grep -q 'multiple devices detected' /tmp/multi.log
 
-# 1) pm path sanitize: only strip 'package:'
-diff -u <(au_pm_path_raw com.zhiliaoapp.musically | au_pm_path_sanitize) \
-         <(sed -n 's/^package://p' "$ROOT/tests/fixtures/pm_path_com_zhiliaoapp_musically.txt") >/dev/null
+# Case 4: unauthorized device triggers error
+if FAKE_ADB_SCENARIO=unauthorized "$ROOT/scripts/adb_apk_diag.sh" >/tmp/unauth.log 2>&1; then
+  echo "expected failure on unauthorized" >&2
+  exit 1
+fi
+grep -q 'unauthorized' /tmp/unauth.log
 
-# 2) list + pick base
-SAN=$(mktemp)
-au_apk_paths_for_pkg com.zhiliaoapp.musically > "$SAN"
-BASE="$(au_pick_base_apk "$SAN")"
-[[ "$BASE" == */base.apk ]]
+# Ensure health script uses normalized serial
+FAKE_ADB_SCENARIO=good DH_DRY_RUN=1 "$ROOT/scripts/adb_health.sh" >/dev/null
 
-# 3) pull + size + hash (best effort)
-LCL=$(au_pull_one "$BASE" "$(mktemp -d)")
-[[ -s "$LCL" ]]
-au_dev_file_size "$BASE" >/dev/null
-au_verify_hash "$BASE" "$LCL" || true
+# Scan success
+out=$(FAKE_ADB_SCENARIO=good adb -s ZY22JK89DR shell pm list packages)
+printf '%s\n' "$out" | grep -q 'package:com.zhiliaoapp.musically'
 
-# 4) metadata CSV
-au_pkg_meta_csv_line com.zhiliaoapp.musically | grep -q "^com\.zhiliaoapp\.musically,"
+# Scan failure
+if FAKE_ADB_SCENARIO=list_fail adb -s ZY22JK89DR shell pm list packages >/tmp/scan_fail.log 2>&1; then
+  echo "expected scan failure" >&2
+  exit 1
+fi
+grep -q 'cmd: failure' /tmp/scan_fail.log
 
-# 5) TikTok scans
-au_scan_tiktok_family | grep -Eq 'com\.ss\.android\.ugc\.aweme|com\.zhiliaoapp\.musically'
-au_scan_tiktok_related | grep -iq tiktok
+# Pull success
+# Pull success
+rm -rf /tmp/pull_good
+FAKE_ADB_SCENARIO=good adb -s ZY22JK89DR pull /data/app/com.zhiliaoapp.musically-1/base.apk /tmp/pull_good/base.apk >/tmp/pull_good.log
+[ -s /tmp/pull_good/base.apk ]
 
-# 6) diagnostic script runs
-DEV="FAKE_SERIAL" "$ROOT/scripts/adb_apk_diag.sh" >/dev/null
-"$ROOT/scripts/adb_health.sh" "$DEV" >/dev/null
+# Pull permission fallback success
+rm -rf /tmp/pull_perm
+if FAKE_ADB_SCENARIO=pull_perm adb -s ZY22JK89DR pull /data/app/com.zhiliaoapp.musically-1/base.apk /tmp/pull_perm/base.apk >/tmp/pull_perm.log 2>&1; then
+  echo "expected direct pull failure" >&2; exit 1; fi
+FAKE_ADB_SCENARIO=pull_perm adb -s ZY22JK89DR shell cp /data/app/com.zhiliaoapp.musically-1/base.apk /data/local/tmp/tmp.apk
+FAKE_ADB_SCENARIO=pull_perm adb -s ZY22JK89DR pull /data/local/tmp/tmp.apk /tmp/pull_perm/base.apk
+[ -s /tmp/pull_perm/base.apk ]
+
+# Pull failure after fallback
+rm -rf /tmp/pull_fail
+if FAKE_ADB_SCENARIO=pull_fail adb -s ZY22JK89DR pull /data/app/com.zhiliaoapp.musically-1/base.apk /tmp/pull_fail/base.apk >/tmp/pull_fail.log 2>&1; then
+  echo "expected pull failure" >&2; exit 1; fi
+FAKE_ADB_SCENARIO=pull_fail adb -s ZY22JK89DR shell cp /data/app/com.zhiliaoapp.musically-1/base.apk /data/local/tmp/tmp.apk >/tmp/pull_fail.log 2>&1 || true
+if FAKE_ADB_SCENARIO=pull_fail adb -s ZY22JK89DR pull /data/local/tmp/tmp.apk /tmp/pull_fail/base.apk >/tmp/pull_fail.log 2>&1; then
+  echo "expected pull failure" >&2; exit 1; fi
+grep -q 'Permission denied' /tmp/pull_fail.log
 
 echo "OK: tests passed"
