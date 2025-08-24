@@ -59,9 +59,6 @@ if [[ "${1:-}" == "-s" ]]; then
       echo "unknown"; exit 1
       ;;
 
-    get-transport-id)
-      echo "1"; exit 0
-      ;;
 
     shell)
       # Reconstruct remaining shell args

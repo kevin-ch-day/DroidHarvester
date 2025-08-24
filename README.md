@@ -14,11 +14,21 @@ Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and `scripts/adb
 
 ## Device selection
 
-Scripts auto-detect the first attached device and trim any stray whitespace or carriage returns from the serial number. Override detection with `DEV=<serial>`.
+DroidHarvester auto-detects a single connected device and normalizes the
+serial (stripping spaces and carriage returns). Override detection with
+`DEV=<serial>`. If multiple devices are attached, set `DEV` or use the
+interactive menu in `run.sh` to choose one.
 
-If multiple devices are connected, set `DEV` explicitly or use the interactive menu in `run.sh`. When a device shows as `unauthorized` or `offline`, run:
+If ADB reports the device as `unauthorized` or `offline`, run:
 
 ```
 adb kill-server
 adb devices    # accept the RSA prompt on the device
 ```
+
+## Pull limitations
+
+Retail builds often block direct pulls from `/data/app`. The tools try a
+fallback copy to `/data/local/tmp`; if that also fails you'll see a
+`Permission denied` message, but the session continues and still produces
+a report.

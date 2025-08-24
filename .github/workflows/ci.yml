@@ -1,19 +1,22 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
-  shellcheck:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Run shellcheck
-        run: shellcheck $(git ls-files '*.sh') || true
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y shellcheck ripgrep
+      - name: Shellcheck
+        run: shellcheck $(git ls-files '*.sh')
       - name: Run tests
-        run: tests/run.sh
+        run: |
+          ./tests/run.sh
+      - name: Guard forbidden strings
+        run: |
+          ! rg -n 'get-transport-id'
+          ! rg -n 'timeout .*adb_retry'

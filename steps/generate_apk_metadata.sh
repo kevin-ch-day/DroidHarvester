@@ -32,7 +32,6 @@ csv_escape() {
 }
 
 if [[ -f "$outfile" ]]; then
-    local sha256 sha1 md5 size perms mtime
     sha256=$(sha256sum "$outfile" | awk '{print $1}')
     sha1=$(sha1sum "$outfile" | awk '{print $1}')
     md5=$(md5sum "$outfile" | awk '{print $1}')
@@ -40,16 +39,15 @@ if [[ -f "$outfile" ]]; then
     perms=$(stat -c%A "$outfile")
     mtime=$(stat -c%y "$outfile")
 
-    local version="unknown"
-    local versionCode="unknown"
-    local targetSdk="unknown"
-    local installer="unknown"
-    local firstInstall="unknown"
-    local lastUpdate="unknown"
-    local uid="unknown"
+    version="unknown"
+    versionCode="unknown"
+    targetSdk="unknown"
+    installer="unknown"
+    firstInstall="unknown"
+    lastUpdate="unknown"
+    uid="unknown"
 
     if [[ "$(basename "$outfile")" == "base.apk" ]]; then
-        local info
         info=$(adb_shell dumpsys package "$pkg" 2>/dev/null || true)
 
         version=$(awk -F= '/versionName/{print $2;exit}' <<<"$info" | xargs || true)
@@ -61,11 +59,11 @@ if [[ -f "$outfile" ]]; then
         uid=$(awk -F= '/userId=/{print $2;exit}' <<<"$info" | xargs || true)
     fi
 
-    local installType="user"
+    installType="user"
     if [[ "$device_path" == /system/* || "$device_path" == /product/* || "$device_path" == /vendor/* || "$device_path" == /apex/* ]]; then
         installType="system"
     fi
-    local role="base"
+    role="base"
     [[ "$(basename "$outfile")" != "base.apk" ]] && role="split"
 
     LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "✅ Metadata for $pkg → $(basename "$outfile")"
@@ -126,8 +124,8 @@ if [[ -f "$outfile" ]]; then
       '{package:$pkg,file:$file,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType,findings:$findings}' \
       >> "$JSON_REPORT.tmp"
 
-    local pulled_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    local base_noext="${outfile%.apk}"
+    pulled_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    base_noext="${outfile%.apk}"
     {
         echo "Package: $pkg"
         echo "APK: $(basename "$outfile")"

@@ -31,7 +31,7 @@ choose_device() {
         return
     fi
     DEVICE="${dev_array[choice-1]}"
-    update_adb_flags
+    set_device "$DEVICE" || { log ERROR "failed to set device"; return; }
 
     DEVICE_DIR="$RESULTS_DIR/$DEVICE"
     mkdir -p "$DEVICE_DIR"
@@ -43,7 +43,7 @@ choose_device() {
     log INFO "Output directory: $DEVICE_DIR"
 
     if [[ "${INCLUDE_DEVICE_PROFILE:-false}" == "true" ]]; then
-        adb $ADB_FLAGS shell getprop | tee -a "$LOGFILE" > "$DEVICE_DIR/device_profile.txt"
+        adb_shell getprop | tee -a "$LOGFILE" > "$DEVICE_DIR/device_profile.txt"
         log INFO "Device profile saved: $DEVICE_DIR/device_profile.txt"
     fi
     unset LOG_DEV

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 # trace.sh - tracing helpers
 # ---------------------------------------------------
