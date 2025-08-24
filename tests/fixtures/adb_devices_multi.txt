@@ -1,0 +1,3 @@
+List of devices attached
+ZY22JK89DR	device
+ABCDEF0123456789	device

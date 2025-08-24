@@ -1,0 +1,2 @@
+List of devices attached
+ZY22JK89DR device product:foo model:Pixel device:bar transport_id:1
