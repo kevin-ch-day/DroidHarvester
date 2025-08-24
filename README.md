@@ -22,15 +22,3 @@ If multiple devices are connected, set `DEV` explicitly or use the interactive m
 adb kill-server
 adb devices    # accept the RSA prompt on the device
 ```
-
-APK pulls may fail on some retail devices due to filesystem restrictions; this is expected and not treated as a bug.
-
-## Tests
-
-A fake-ADB harness under `tests/fakes/` allows running checks without a device:
-
-```bash
-bash -n run.sh lib/**/*.sh scripts/**/*.sh
-shellcheck -S warning run.sh lib/**/*.sh scripts/**/*.sh || true
-tests/run.sh
-```

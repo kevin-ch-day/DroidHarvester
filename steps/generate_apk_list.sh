@@ -19,6 +19,10 @@ for m in core/logging core/errors core/trace core/device io/apk_utils; do
   source "$REPO_ROOT/lib/$m.sh"
 done
 
+DEVICE="$(printf '%s' "${DEVICE:-}" | tr -d '\r' | xargs)"
+assert_device_ready "$DEVICE"
+update_adb_flags
+
 ensure_timeouts_defaults
 
 # shield ERR while running fallbacks

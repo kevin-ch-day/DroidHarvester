@@ -11,6 +11,14 @@ init_session() {
     RESULTS_DIR="$SCRIPT_DIR/results"
     LOGS_DIR="$SCRIPT_DIR/logs"
     mkdir -p "$RESULTS_DIR" "$LOGS_DIR"
+    if (( CLEAN_LOGS == 1 )); then
+        find "$LOGS_DIR" -mindepth 1 -delete 2>/dev/null || true
+    else
+        LOG_RETENTION_DAYS=${LOG_RETENTION_DAYS:-7}
+        find "$LOGS_DIR" -type f -mtime +"$LOG_RETENTION_DAYS" -print -delete 2>/dev/null || true
+    fi
+    RESULTS_RETENTION_DAYS=${RESULTS_RETENTION_DAYS:-30}
+    find "$RESULTS_DIR" -mindepth 1 -mtime +"$RESULTS_RETENTION_DAYS" -print -delete 2>/dev/null || true
 
     LOGFILE="$LOGS_DIR/harvest_log_$TIMESTAMP.txt"
     REPORT="$RESULTS_DIR/apks_report_$TIMESTAMP.csv"

@@ -21,6 +21,10 @@ for m in core/logging core/errors core/trace core/device io/report; do
   source "$REPO_ROOT/lib/$m.sh"
 done
 
+DEVICE="$(printf '%s' "${DEVICE:-}" | tr -d '\r' | xargs)"
+assert_device_ready "$DEVICE"
+update_adb_flags
+
 csv_escape() {
     local q='"'
     local str=${1//$q/$q$q}

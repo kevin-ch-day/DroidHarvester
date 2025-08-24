@@ -9,13 +9,20 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # Default retry/backoff values (override with env if needed)
 : "${DH_RETRIES:=3}"
 : "${DH_BACKOFF:=1}"
+
 : "${DH_PULL_TIMEOUT:=60}"
 : "${DH_SHELL_TIMEOUT:=15}"
 
+# Refresh ADB_FLAGS whenever DEVICE is set
+update_adb_flags() {
+    ADB_FLAGS="-s $DEVICE"
+    export ADB_FLAGS
+}
+
 adb_healthcheck() {
     LOG_COMP="adb" log INFO "adb get-state" && adb get-state || true
-    LOG_COMP="adb" log INFO "adb -s $DEVICE shell echo OK" && adb -s "$DEVICE" shell echo OK || true
-    LOG_COMP="adb" log INFO "device df" && adb -s "$DEVICE" shell df -h /data || true
+    LOG_COMP="adb" log INFO "adb $ADB_FLAGS shell echo OK" && adb $ADB_FLAGS shell echo OK || true
+    LOG_COMP="adb" log INFO "device df" && adb $ADB_FLAGS shell df -h /data || true
     LOG_COMP="host" log INFO "host df" && df -h . || true
 }
 
@@ -31,7 +38,7 @@ adb_retry() {
     local attempt=0 rc=0 start end dur
     start=$(date +%s%3N)
     while (( attempt < max )); do
-        with_trace "$label" -- adb -s "$DEVICE" "${cmd[@]}" && return 0
+        with_trace "$label" -- adb $ADB_FLAGS "${cmd[@]}" && return 0
         rc=$?
         attempt=$((attempt+1))
         (( attempt < max )) && sleep "$backoff"

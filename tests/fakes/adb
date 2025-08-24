@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
+# Fake ADB shim for tests. Select behavior via FAKE_ADB_SCENARIO.
+# Scenarios:
+#   good         : one device "ZY22JK89DR " (trailing space) in 'device' state
+#   crlf         : one device with CR in serial to test trimming
+#   multi        : two devices in 'device' state
+#   unauthorized : one device in 'unauthorized' state
+#   list_fail    : pm list packages fails
+#   pull_perm    : pull only allowed from /data/local/tmp (simulates prod perms)
+#   pull_fail    : all pulls fail
 set -euo pipefail
 mode="${FAKE_ADB_SCENARIO:-good}"
 
-if [[ "$1" == "devices" ]]; then
+print_devices() {
   case "$mode" in
-    good)
+    good|list_fail|pull_perm|pull_fail)
+      # Note the deliberate trailing space before the tab to test trimming
       printf 'List of devices attached\nZY22JK89DR \tdevice\n'
       ;;
     crlf)
+      # Deliberate CR to test CR-stripping
       printf 'List of devices attached\nZY22JK89DR\r\tdevice\n'
       ;;
     multi)
@@ -20,43 +31,149 @@ if [[ "$1" == "devices" ]]; then
       printf 'List of devices attached\n\n'
       ;;
   esac
+}
+
+# adb devices (and adb devices -l)
+if [[ "${1:-}" == "devices" ]]; then
+  print_devices
   exit 0
 fi
 
-if [[ "$1" == "-s" ]]; then
-  shift
-  serial="$1"; shift
-  cmd="$1"; shift || true
-  if [[ "$cmd" == "get-state" ]]; then
-    if [[ "$serial" == "ZY22JK89DR" ]]; then
-      echo "device"
-      exit 0
-    fi
-    echo "unknown"
-    exit 1
-  fi
-  if [[ "$cmd" == "shell" ]]; then
-    if [[ "$1" == "pm" && "$2" == "path" ]]; then
-      echo "package:/data/app/com.zhiliaoapp.musically-1/base.apk"
-      exit 0
-    fi
-    if [[ "$1" == "echo" && "$2" == "OK" ]]; then
-      echo "OK"
-      exit 0
-    fi
-    exit 0
-  fi
-  if [[ "$cmd" == "pull" ]]; then
-    dst="${@: -1}"
-    mkdir -p "$(dirname "$dst")"
-    echo "dummy" >"$dst"
-    exit 0
-  fi
-fi
-
-if [[ "$1" == "get-state" ]]; then
+# Top-level get-state without -s (some scripts do this)
+if [[ "${1:-}" == "get-state" ]]; then
   echo "device"
   exit 0
 fi
 
+# Handle "-s <serial> <cmd> ..."
+if [[ "${1:-}" == "-s" ]]; then
+  shift
+  serial="${1:-}"; shift || true
+  cmd="${1:-}";    shift || true
+
+  case "$cmd" in
+    get-state)
+      if [[ "${serial% }" == "ZY22JK89DR" ]]; then
+        echo "device"; exit 0
+      fi
+      echo "unknown"; exit 1
+      ;;
+
+    get-transport-id)
+      echo "1"; exit 0
+      ;;
+
+    shell)
+      # Reconstruct remaining shell args
+      sub="${1:-}"; shift || true
+      case "$sub" in
+        echo)
+          # e.g. adb -s ... shell echo OK
+          if [[ "${1:-}" == "OK" ]]; then echo "OK"; fi
+          exit 0
+          ;;
+
+        df)
+          # Minimal df output for health checks
+          cat <<'EOF'
+Filesystem       Size Used Avail Use% Mounted on
+/dev/block/dm-50 110G  15G   96G  14% /storage/emulated/0/Android/obb
+EOF
+          exit 0
+          ;;
+
+        pm)
+          sub2="${1:-}"; shift || true
+          case "$sub2" in
+            path)
+              # Return at least one APK path
+              pkg="${1:-com.zhiliaoapp.musically}"
+              echo "package:/data/app/~~GiOQmESL3HTbor5kPLWnoQ==/${pkg}-1/base.apk"
+              # Optionally more splits could be added here if needed by tests
+              exit 0
+              ;;
+            list)
+              # e.g. pm list packages  OR  pm list packages -f -3
+              # Fail if scenario dictates; otherwise return a small set
+              if [[ "$mode" == "list_fail" ]]; then
+                echo "cmd: failure" >&2
+                exit 1
+              fi
+              # Basic responses for both plain and "-f -3"
+              if [[ "${1:-}" == "packages" ]]; then
+                if [[ "${2:-}" == "-f" && "${3:-}" == "-3" ]]; then
+                  echo "package:/data/app/~~GiOQmESL3HTbor5kPLWnoQ==/com.zhiliaoapp.musically-1/base.apk=com.zhiliaoapp.musically"
+                else
+                  echo "package:com.zhiliaoapp.musically"
+                fi
+                exit 0
+              fi
+              echo "package:com.zhiliaoapp.musically"
+              exit 0
+              ;;
+          esac
+          ;;
+
+        cp)
+          # Simulate copy-to-tmp step sometimes used before pull
+          # Allow in pull_perm mode only when dest is /data/local/tmp/*
+          # Accept and succeed for simplicity otherwise.
+          src="${1:-}"; dst="${2:-}"
+          if [[ "$mode" == "pull_perm" ]]; then
+            [[ "$dst" == /data/local/tmp/* ]] && exit 0
+            exit 1
+          fi
+          exit 0
+          ;;
+
+        rm)
+          # Always succeed
+          exit 0
+          ;;
+
+        *)
+          # Default success for other shell subcommands
+          exit 0
+          ;;
+      esac
+      ;;
+
+    pull)
+      # Simulate adb pull SRC [DST|DIR]
+      # Treat the last arg as the destination path.
+      # In success cases, create the destination and write a dummy file.
+      args=("$@")
+      src="${args[0]:-}"
+      dst="${args[-1]:-}"
+      mkdir -p "$(dirname "$dst")"
+
+      case "$mode" in
+        pull_perm)
+          # Only allow pulls from /data/local/tmp/*
+          if [[ "$src" == /data/local/tmp/* ]]; then
+            printf 'dummy\n' >"$dst"
+            exit 0
+          fi
+          echo "Permission denied" >&2
+          exit 1
+          ;;
+        pull_fail)
+          echo "Permission denied" >&2
+          exit 1
+          ;;
+        *)
+          printf 'dummy\n' >"$dst"
+          exit 0
+          ;;
+      esac
+      ;;
+
+    *)
+      # Unknown subcommand with -s: succeed by default to keep tests simple
+      exit 0
+      ;;
+  esac
+fi
+
+# Default success for anything else
 exit 0

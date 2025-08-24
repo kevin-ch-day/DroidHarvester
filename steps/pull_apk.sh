@@ -20,17 +20,14 @@ for m in core/logging core/errors core/trace core/device io/apk_utils; do
   source "$REPO_ROOT/lib/$m.sh"
 done
 
+DEVICE="$(printf '%s' "${DEVICE:-}" | tr -d '\r' | xargs)"
+assert_device_ready "$DEVICE"
+update_adb_flags
+
 ensure_timeouts_defaults
 
-IFS=$'\0' read -r outdir outfile role < <(compute_outfile_vars "$pkg" "$apk_path")
+IFS=$'\0' read -r outdir outfile role < <(compute_outfile_vars "$pkg" "$apk_path") || true
 mkdir -p -- "$outdir"
-
-if ! with_trace adb_test -- adb -s "$DEVICE" shell test -f "$apk_path"; then
-  rc=$?
-  LOG_CODE="${E_APK_MISSING:-31}" LOG_RC="$rc" LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" \
-    log WARN "apk missing $apk_path"
-  exit 1
-fi
 
 LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Pulling $role APK $apk_path"
 
