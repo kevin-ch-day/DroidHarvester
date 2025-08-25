@@ -86,7 +86,7 @@ while true; do
   [[ -n "$LAST_TXT_REPORT" ]] && header_report="$(basename "$LAST_TXT_REPORT")"
 
   render_main_menu "DroidHarvester Main Menu" "$DEVICE" "$header_report"
-  choice="$(read_choice_range 0 13)"
+  choice="$(read_choice_range 0 14)"
   echo
 
   case "$choice" in
@@ -103,6 +103,12 @@ while true; do
         if [[ -x "$REPO_ROOT/scripts/finalize_quickpull.sh" ]]; then
           echo "[INFO] Finalizing quick pull (friendly names + manifest)..."
           "$REPO_ROOT/scripts/finalize_quickpull.sh" || true
+          qdir="$RESULTS_DIR/$DEV/quick_pull_results"
+          if [[ -f "$qdir/manifest.csv" ]]; then
+            QUICK_PULL_DIR="$(basename "$qdir")"
+            PKGS_FOUND=$(tail -n +2 "$qdir/manifest.csv" | cut -d, -f3 | sort -u | wc -l | tr -d ' ')
+            PKGS_PULLED=$(( $(wc -l < "$qdir/manifest.csv" | tr -d ' ') - 1 ))
+          fi
         fi
       else
         LOG_COMP="core" log WARN "scripts/grab_apks.sh missing or not executable."
@@ -111,18 +117,27 @@ while true; do
       ;;
 
     5)
+      # Show latest quick-pull
+      if [[ -x "$REPO_ROOT/scripts/show_latest_quickpull.sh" ]]; then
+        "$REPO_ROOT/scripts/show_latest_quickpull.sh" || true
+      else
+        echo "[ERR] scripts/show_latest_quickpull.sh missing or not executable." >&2
+      fi
+      ;;
+
+    6)
       # Full pipeline (metadata, reports)
       ensure_device_selected
       harvest
       ;;
-    6) view_report ;;
-    7) list_installed_apps ;;
-    8) search_installed_apps ;;
-    9) capability_report ;;
-    10) export_report ;;
-    11) resume_last_session ;;
-    12) cleanup_partial_run ;;
-    13) cleanup_all_artifacts ;;
+    7) view_report ;;
+    8) list_installed_apps ;;
+    9) search_installed_apps ;;
+    10) capability_report ;;
+    11) export_report ;;
+    12) resume_last_session ;;
+    13) cleanup_partial_run ;;
+    14) cleanup_all_artifacts ;;
 
     0)
       LOG_COMP="core" log INFO "Exiting DroidHarvester."

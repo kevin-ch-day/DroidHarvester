@@ -24,6 +24,12 @@ Typical workflow:
 
 Artifacts and logs are written under `results/<serial>/` and `logs/` by default.
 
+After `[4] Quick APK Harvest`, friendly copies are normalized under
+`results/<serial>/quick_pull_results/`. Each app gets a human-friendly
+directory and versioned filename, and a run-level `manifest.csv` lists
+every base and split APK. Package→name mappings live in
+`config/packages.sh` and can be customized.
+
 Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and
 `scripts/adb_health.sh`, both of which reuse the core helpers.
 
@@ -121,6 +127,15 @@ The behaviour of pull helpers can be tuned with environment variables:
 | `DH_PULL_TIMEOUT` | Seconds for adb pull (default 60). |
 | `DH_RETRIES` | Retry count for ADB commands (default 3). |
 | `DH_BACKOFF` | Seconds between retries (default 1). |
+
+## UI theme configuration
+
+The interactive menus use a high-contrast palette tuned for dark terminals. Use the following knobs to adjust or disable styling:
+
+- `NO_COLOR=1` – disable all colors.
+- `DH_THEME=mono` – keep layout but drop colors.
+- `DH_THEME=dark-hi` – explicit high-contrast theme (default).
+- `DH_NO_UNICODE=1` – use plain ASCII borders instead of Unicode.
 
 ## Tests
 

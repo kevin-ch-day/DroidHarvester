@@ -18,30 +18,24 @@ render_main_menu() {
     fi
 
     draw_menu_header "$title" "$device" "$last_report"
-    echo " Harvested   : found ${PKGS_FOUND:-0} pulled ${PKGS_PULLED:-0}"
-    echo " Targets     : ${#TARGET_PACKAGES[@]} default / ${custom_count} custom"
-
+    printf " ${WHITE}Harvested${NC}: found ${YELLOW}%s${NC} / pulled ${YELLOW}%s${NC} | Targets: ${YELLOW}%s${NC} default / ${YELLOW}%s${NC} custom | Latest: %s\n" \
+        "${PKGS_FOUND:-0}" "${PKGS_PULLED:-0}" "${#TARGET_PACKAGES[@]}" "$custom_count" "${QUICK_PULL_DIR:-n/a}"
     echo
-    local options=(
-        "Choose device"
-        "Scan for target apps"
-        "Add custom package"
-        "Quick APK Harvest"
-        "Harvest APKs + metadata"
-        "View last report"
-        "List ALL installed apps"
-        "Search installed apps"
-        "Device capability report"
-        "Export report bundle"
-        "Resume last session"
-        "Clean up partial run"
+    show_menu \
+        "Choose device" \
+        "Scan for target apps" \
+        "" \
+        "Add custom package" \
+        "Quick APK Harvest" \
+        "Show latest quick-pull" \
+        "Harvest APKs + metadata" \
+        "" \
+        "View last report" \
+        "List ALL installed apps" \
+        "Search installed apps" \
+        "Device capability report" \
+        "Export report bundle" \
+        "Resume last session" \
+        "Clean up partial run" \
         "Clear logs/results"
-    )
-    local i=1
-    for opt in "${options[@]}"; do
-        printf "  ${BLUE}[%2d]${NC} %s\n" "$i" "$opt"
-        ((i++))
-    done
-    printf "  ${BLUE}[ 0]${NC} Exit\n"
-    echo "${CYAN}------------------------------------------------------------${NC}"
 }
