@@ -38,7 +38,12 @@ cd scripts
 ./adb_apk_diag.sh com.zhiliaoapp.musically   # writes results/<DEVICE>/manual_diag_<ts>
 ```
 
-Configuration values are now loaded from `config/*.sh` rather than a single `config.sh`.
+## Configuration layout & overrides
+
+Configuration defaults live under `config/` and are loaded via `config/config.sh`.
+To tweak settings, create `config/local.sh` and assign variables such as
+`LOG_LEVEL=DEBUG`. New code should source `config/config.sh`; the repository
+root `config.sh` remains as a shim for legacy scripts.
 
 ## Using device helper modules
 
@@ -46,6 +51,7 @@ To write scripts that interact with a device:
 
 ```bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/config/config.sh"
 source "$ROOT/lib/core/logging.sh"
 source "$ROOT/lib/core/device/env.sh"
 source "$ROOT/lib/core/device/select.sh"

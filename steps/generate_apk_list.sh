@@ -13,7 +13,7 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1090
-source "$REPO_ROOT/config.sh"
+source "$REPO_ROOT/config/config.sh"
 # shellcheck disable=SC1090
 for m in core/logging core/errors core/trace core/device io/apk_utils; do
   source "$REPO_ROOT/lib/$m.sh"

@@ -11,7 +11,7 @@ LOG_DIR="$REPO_ROOT/log"
 mkdir -p "$LOG_DIR"
 
 # shellcheck disable=SC1090
-source "$REPO_ROOT/config.sh"
+source "$REPO_ROOT/config/config.sh"
 for m in core/logging core/errors core/deps; do
   # shellcheck disable=SC1090
   source "$REPO_ROOT/lib/$m.sh"

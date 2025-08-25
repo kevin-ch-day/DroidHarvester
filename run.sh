@@ -17,27 +17,17 @@ DEVICE=""
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 DH_DEBUG=${DH_DEBUG:-0}
 
-# Load error/logging helpers early
+# Load config first so logging picks up overrides
 # shellcheck disable=SC1090
-source "$REPO_ROOT/lib/core/errors.sh"
+source "$REPO_ROOT/config/config.sh"
+
+# Logging then errors depend on config
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/logging.sh"
+# shellcheck disable=SC1090
+source "$REPO_ROOT/lib/core/errors.sh"
 
 export LOG_LEVEL DH_DEBUG
-
-# Load all config snippets from config/*.sh
-for f in "$REPO_ROOT"/config/*.sh; do
-    # shellcheck disable=SC1090
-    [[ -r "$f" ]] && source "$f"
-done
-# Validate if helper exists
-if declare -F validate_config >/dev/null 2>&1; then
-    validate_config
-fi
-
-if [[ "${CLEAR_LOGS:-false}" == "true" ]]; then
-    find "$LOG_ROOT" -type f -name '*.txt' -delete 2>/dev/null || true
-fi
 
 # Core + IO + menu libs
 # shellcheck disable=SC1090
