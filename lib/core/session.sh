@@ -23,6 +23,14 @@ init_session() {
     trap cleanup_reports EXIT
 
     DEVICE=""
+    DEVICE_LABEL=""
+    DEVICE_SERIAL=""
+    DEVICE_VENDOR=""
+    DEVICE_MODEL=""
+    DEVICE_ANDROID_VERSION=""
+    DEVICE_BUILD_ID=""
+    DEVICE_DIR=""
+    DEVICE_DIR_NAME=""
     CUSTOM_PACKAGES=()
     CUSTOM_PACKAGES_FILE="$REPO_ROOT/custom_packages.txt"
     [[ -f "$CUSTOM_PACKAGES_FILE" ]] && mapfile -t CUSTOM_PACKAGES < "$CUSTOM_PACKAGES_FILE"
@@ -43,6 +51,11 @@ session_metadata() {
         echo " User       : $(whoami)"
         echo " Date       : $(date)"
         echo " OS         : $(uname -srvmo)"
+        if [[ -n "${DEVICE_LABEL:-}" ]]; then
+            echo " Device     : $DEVICE_LABEL"
+            echo " Android    : ${DEVICE_ANDROID_VERSION:-unknown}"
+            echo " Build ID   : ${DEVICE_BUILD_ID:-unknown}"
+        fi
         echo "=================================================="
     } >> "$LOGFILE"
     log INFO "Session initialized (log: $LOGFILE)"

@@ -10,6 +10,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
 DEVICE=""
+DEVICE_LABEL=""
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 DH_DEBUG="${DH_DEBUG:-0}"
 
@@ -66,6 +67,9 @@ fi
 if [[ -n "$DEVICE" ]]; then
   if ! assert_device_ready "$DEVICE"; then
     DEVICE=""
+  else
+    gather_device_profile "$DEVICE"
+    init_report
   fi
 fi
 
@@ -85,7 +89,7 @@ while true; do
   header_report=""
   [[ -n "$LAST_TXT_REPORT" ]] && header_report="$(basename "$LAST_TXT_REPORT")"
 
-  render_main_menu "DroidHarvester Main Menu" "$DEVICE" "$header_report"
+  render_main_menu "DroidHarvester Main Menu" "${DEVICE_LABEL:-}" "$header_report"
   choice="$(read_choice_range 0 14)"
   echo
 
@@ -103,7 +107,7 @@ while true; do
         if [[ -x "$REPO_ROOT/scripts/finalize_quickpull.sh" ]]; then
           echo "[INFO] Finalizing quick pull (friendly names + manifest)..."
           "$REPO_ROOT/scripts/finalize_quickpull.sh" || true
-          qdir="$RESULTS_DIR/$DEVICE/quick_pull_results"
+          qdir="$DEVICE_DIR/quick_pull_results"
           if [[ -f "$qdir/manifest.csv" ]]; then
             QUICK_PULL_DIR="$(basename "$qdir")"
             PKGS_FOUND=$(tail -n +2 "$qdir/manifest.csv" | cut -d, -f3 | sort -u | wc -l | tr -d ' ')

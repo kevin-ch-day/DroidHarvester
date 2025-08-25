@@ -18,10 +18,13 @@ init_report() {
         echo "# Host,$(hostname)"
         echo "# User,$(whoami)"
         echo "# OS,$(uname -srvmo)"
-        echo "# Device,$DEVICE"
-        echo "# Fingerprint,$DEVICE_FINGERPRINT"
+        echo "# DeviceVendor,$DEVICE_VENDOR"
+        echo "# DeviceModel,$DEVICE_MODEL"
+        echo "# DeviceSerial,$DEVICE_SERIAL"
+        echo "# Android,$DEVICE_ANDROID_VERSION"
+        echo "# BuildID,$DEVICE_BUILD_ID"
         echo "# Log,$LOGFILE"
-        echo "package,file,sha256,sha1,md5,size,perms,modified,version,versionCode,targetSdk,installer,firstInstall,lastUpdate,uid,installType,findings"
+        echo "package,file,role,sha256,sha1,md5,size,perms,modified,version,versionCode,targetSdk,installer,firstInstall,lastUpdate,uid,installType,findings"
     } > "$REPORT"
     
     # JSON temp
@@ -38,8 +41,10 @@ init_report() {
         echo "Host        : $(hostname)"
         echo "User        : $(whoami)"
         echo "OS          : $(uname -srvmo)"
-        echo "Device ID   : ${DEVICE:-unknown}"
-        echo "Fingerprint : ${DEVICE_FINGERPRINT:-unknown}"
+        echo "Device      : ${DEVICE_VENDOR:-unknown} ${DEVICE_MODEL:-unknown}"
+        echo "Serial      : ${DEVICE_SERIAL:-unknown}"
+        echo "Android     : ${DEVICE_ANDROID_VERSION:-unknown}"
+        echo "Build ID    : ${DEVICE_BUILD_ID:-unknown}"
         echo "Log File    : $LOGFILE"
         echo "Output Path : $DEVICE_DIR"
         echo "============================================================"
@@ -66,19 +71,21 @@ init_report() {
 append_txt_report() {
     local pkg="$1"
     local outfile="$2"
-    local sha256="$3"
-    local sha1="$4"
-    local md5="$5"
-    local size="$6"
-    local version="$7"
-    local versionCode="$8"
-    local targetSdk="$9"
-    local installer="${10}"
-    local installType="${11}"
+    local role="$3"
+    local sha256="$4"
+    local sha1="$5"
+    local md5="$6"
+    local size="$7"
+    local version="$8"
+    local versionCode="$9"
+    local targetSdk="${10}"
+    local installer="${11}"
+    local installType="${12}"
 
     {
         echo "Package Name : $pkg"
         echo "APK File     : $outfile"
+        echo "Role         : $role"
         echo "SHA256       : $sha256"
         echo "SHA1         : $sha1"
         echo "MD5          : $md5"
@@ -123,10 +130,13 @@ finalize_report() {
             --arg host "$(hostname)" \
             --arg user "$(whoami)" \
             --arg os "$(uname -srvmo)" \
-            --arg device "$DEVICE" \
-            --arg fp "$DEVICE_FINGERPRINT" \
+            --arg serial "$DEVICE_SERIAL" \
+            --arg vendor "$DEVICE_VENDOR" \
+            --arg model "$DEVICE_MODEL" \
+            --arg android "$DEVICE_ANDROID_VERSION" \
+            --arg build "$DEVICE_BUILD_ID" \
             --arg log "$LOGFILE" \
-            '{session:{id:$sid,host:$host,user:$user,os:$os,device:$device,fingerprint:$fp,log:$log},apps:.}' \
+            '{session:{id:$sid,host:$host,user:$user,os:$os,device:{serial:$serial,vendor:$vendor,model:$model,android:$android,build:$build},log:$log},apps:.}' \
             "$JSON_REPORT.tmp" > "$JSON_REPORT"
         log INFO "JSON report saved: $JSON_REPORT"
     fi

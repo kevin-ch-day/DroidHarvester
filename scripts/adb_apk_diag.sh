@@ -82,8 +82,16 @@ assert_device_ready "$DEVICE"
 # ---- Working dirs ------------------------------------------------------------
 TS="$(date +%Y%m%d_%H%M%S)"
 PKG_ESC="${PKG//./_}"
-BASE_DIR="$ROOT/results/$DEVICE"
-RUN_DIR="$BASE_DIR/manual_diag_${TS}"
+to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_'; }
+DEVICE_VENDOR="$(adb -s "$DEVICE" shell getprop ro.product.manufacturer | tr -d '\r')"
+DEVICE_MODEL="$(adb -s "$DEVICE" shell getprop ro.product.model | tr -d '\r')"
+safe_vendor="$(to_safe "$DEVICE_VENDOR")"
+safe_model="$(to_safe "$DEVICE_MODEL")"
+DEVICE_DIR="$ROOT/results/${safe_vendor}_${safe_model}_${DEVICE}"
+DEVICE_LABEL="$DEVICE_VENDOR $DEVICE_MODEL [$DEVICE]"
+LOG_DEV="$DEVICE_LABEL"
+export LOG_DEV
+RUN_DIR="$DEVICE_DIR/manual_diag_${TS}"
 mkdir -p "$RUN_DIR"
 
 # ---- Collect paths (raw + sanitize) -----------------------------------------

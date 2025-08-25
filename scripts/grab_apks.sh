@@ -20,6 +20,8 @@ TS="$(date +%Y%m%d_%H%M%S)"
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/logging/logging_engine.sh"
+# shellcheck disable=SC1090
+source "$REPO_ROOT/lib/io/pull_file.sh"
 log_file_init "$(_log_path apk_grab)"
 
 # adb + device
@@ -29,13 +31,34 @@ SERIAL="$("$ADB_BIN" get-serialno 2>/dev/null || true)"
 [[ -n "$SERIAL" && "$SERIAL" != "unknown" ]] || { log ERROR "no device"; exit 3; }
 ADB_S=(-s "$SERIAL")
 
-OUT_ROOT="${RESULTS_DIR}/${SERIAL}/quick_pull_${TS}"
+to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_'; }
+
+DEVICE_VENDOR="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.product.manufacturer | tr -d '\r')"
+DEVICE_MODEL="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.product.model | tr -d '\r')"
+DEVICE_ANDROID_VERSION="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.build.version.release | tr -d '\r')"
+DEVICE_BUILD_ID="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.build.id | tr -d '\r')"
+safe_vendor="$(to_safe "$DEVICE_VENDOR")"
+safe_model="$(to_safe "$DEVICE_MODEL")"
+DEVICE_DIR_NAME="${safe_vendor}_${safe_model}_${SERIAL}"
+DEVICE_DIR="${RESULTS_DIR}/${DEVICE_DIR_NAME}"
+OUT_ROOT="${DEVICE_DIR}/quick_pull_${TS}"
 mkdir -p "$OUT_ROOT"
+DEVICE_LABEL="$DEVICE_VENDOR $DEVICE_MODEL [$SERIAL]"
+LOG_DEV="$DEVICE_LABEL"
+export LOG_DEV
+{
+  echo "serial=$SERIAL"
+  echo "vendor=$DEVICE_VENDOR"
+  echo "model=$DEVICE_MODEL"
+  echo "android_version=$DEVICE_ANDROID_VERSION"
+  echo "build_id=$DEVICE_BUILD_ID"
+  "$ADB_BIN" "${ADB_S[@]}" shell getprop
+} > "$DEVICE_DIR/device_profile.txt" 2>/dev/null || true
 
 # Targets from config (plus any customs that config appended)
 (( ${#TARGET_PACKAGES[@]} )) || { log WARN "no targets defined"; exit 0; }
 
-log INFO "device : $SERIAL"
+log INFO "device : $DEVICE_LABEL"
 log INFO "output : $OUT_ROOT"
 log INFO "targets: ${TARGET_PACKAGES[*]}"
 
@@ -59,21 +82,6 @@ sha256_host() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$f" | awk '{print $1}'
   else shasum -a 256 "$f" | awk '{print $1}'; fi
 }
-safe_pull_file() {
-  # 1) try adb pull; 2) fallback to adb exec-out cat stream
-  local remote="$1" dest="$2"
-  if "$ADB_BIN" "${ADB_S[@]}" pull "$remote" "$dest" >/dev/null 2>&1; then
-    return 0
-  fi
-  # fallback stream
-  if "$ADB_BIN" "${ADB_S[@]}" exec-out "cat \"$remote\"" > "${dest}.part" 2>/dev/null; then
-    mv -f "${dest}.part" "$dest"
-    return 0
-  fi
-  rm -f "${dest}.part" >/dev/null 2>&1 || true
-  return 1
-}
-
 pull_one_pkg() {
   local pkg="$1"
   local pkg_root="$OUT_ROOT/$pkg"
@@ -101,11 +109,11 @@ pull_one_pkg() {
   printf "pkg,versionName,versionCode,installer\n%s,%s,%s,%s\n" "$pkg" "${vn:-}" "${vc:-}" "${inst:-}" > "$meta_dir/meta.csv"
 
   local csv="$pkg_root/pull_manifest.csv"
-  echo "pkg,apk_type,remote_path,remote_bytes,local_bytes,sha256,status" > "$csv"
+  echo "pkg,apk_role,remote_path,remote_bytes,local_bytes,sha256,status" > "$csv"
 
   while IFS= read -r rp; do
     [[ -n "$rp" ]] || continue
-    local kind="split"; [[ "$rp" =~ /base\.apk$ ]] && kind="base"
+    local apk_role="split"; [[ "$rp" =~ /base\.apk$ ]] && apk_role="base"
     local rb; rb="$(remote_size "$rp" || echo 0)"; rb="${rb:-0}"
     local fn; fn="$(basename "$rp")"
     local dest="$pulled/$fn"
@@ -115,9 +123,9 @@ pull_one_pkg() {
       local lb; lb="$(stat -c %s "$dest" 2>/dev/null || wc -c < "$dest" 2>/dev/null || echo 0)"
       local sh; sh="$(sha256_host "$dest" 2>/dev/null || echo NA)"
       local status="OK"; [[ "$rb" != "0" && "$lb" != "$rb" ]] && status="SIZE_MISMATCH"
-      printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$kind" "$rp" "$rb" "$lb" "$sh" "$status" >> "$csv"
+      printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$apk_role" "$rp" "$rb" "$lb" "$sh" "$status" >> "$csv"
     else
-      printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$kind" "$rp" "$rb" "0" "NA" "PULL_FAIL" >> "$csv"
+      printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$apk_role" "$rp" "$rb" "0" "NA" "PULL_FAIL" >> "$csv"
       log WARN "$pkg: pull failed for $fn"
       rm -f "$dest" || true
     fi

@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/config/config.sh"
 
 # core libs
-for m in logging/logging_engine core/errors core/trace core/device io/apk_utils io/report; do
+for m in logging/logging_engine core/errors core/trace core/device io/apk_utils io/pull_file io/report; do
   # shellcheck source=/dev/null
   source "$REPO_ROOT/lib/$m.sh"
 done
@@ -64,9 +64,11 @@ if [[ -n "$DST_OVERRIDE" ]]; then
 else
   # compute_outfile_vars should print NUL-separated: outdir\0outfile\0role
   if declare -F compute_outfile_vars >/dev/null; then
+    # Default implementation stores artifacts under
+    #   $RESULTS_DIR/$DEVICE/<pkg>/<split_name>/
     IFS=$'\0' read -r OUTDIR OUTFILE ROLE < <(compute_outfile_vars "$PKG" "$APK_PATH")
   else
-    # Fallback layout: results/<DEV>/<pkg>/   file named by split/base
+    # Fallback layout: results/<DEV>/<pkg>/base.apk
     OUTDIR="$RESULTS_DIR/$DEVICE/$PKG"
     mkdir -p "$OUTDIR"
     base="$(basename -- "$APK_PATH")"
@@ -91,9 +93,8 @@ start_ns="$(date +%s%N || true)"
 
 log INFO "Pulling $ROLE APK from $APK_PATH -> $OUTFILE"
 
-# Use the new smart helper; it must see ADB_BIN/ADB_ARGS/DH_PULL_TIMEOUT.
-# pull_apk_smart chooses the best method and falls back as needed.
-if ! pull_apk_smart "$APK_PATH" "$tmp"; then
+# Use smart helper with multiple fallbacks (adb pull, exec-out, tmp copy)
+if ! safe_pull_file "$APK_PATH" "$tmp"; then
   rc=$?
   LOG_CODE="${E_PULL_FAIL:-32}" LOG_RC="$rc" log ERROR "pull failed for $APK_PATH"
   exit 1

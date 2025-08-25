@@ -64,27 +64,27 @@ awk -F, '
 ' < /dev/null >/dev/null 2>&1 || true
 
 # Use xargs defensively to handle many files; AWK does the real work
-# Columns (as written by grab_apks.sh): pkg,apk_type,remote_path,remote_bytes,local_bytes,sha256,status
+# Columns (as written by grab_apks.sh): pkg,apk_role,remote_path,remote_bytes,local_bytes,sha256,status
 xargs_awk() {
   awk -F, '
-    FNR==1 && NR>1 { next }                          # skip header rows except first file
-    NR>1 {                                           # data rows
-      pkg=$1; kind=$2; status=$7;
-      gsub(/\r/,"",status)
-      tot[status]++
-      pkgs[pkg]=1
+      FNR==1 && NR>1 { next }                          # skip header rows except first file
+      NR>1 {                                           # data rows
+        pkg=$1; role=$2; status=$7;
+        gsub(/\r/,"",status)
+        tot[status]++
+        pkgs[pkg]=1
 
-      if (kind=="base") { bTot[pkg]++; if (status=="OK") bOK[pkg]++ }
-      else               { sTot[pkg]++; if (status=="OK") sOK[pkg]++ }
+        if (role=="base") { bTot[pkg]++; if (status=="OK") bOK[pkg]++ }
+        else               { sTot[pkg]++; if (status=="OK") sOK[pkg]++ }
 
-      if (status!="OK") {
-        # capture first 3 problem lines per package for a short preview
-        if (probCnt[pkg] < 3) {
-          prob[pkg,probCnt[pkg]] = sprintf("%s [%s] %s", kind, status, $3) # remote_path
-          probCnt[pkg]++
+        if (status!="OK") {
+          # capture first 3 problem lines per package for a short preview
+          if (probCnt[pkg] < 3) {
+            prob[pkg,probCnt[pkg]] = sprintf("%s [%s] %s", role, status, $3) # remote_path
+            probCnt[pkg]++
+          }
         }
       }
-    }
     END {
       # overall status tallies
       for (k in tot) printf("  %s: %d\n", k, tot[k])
