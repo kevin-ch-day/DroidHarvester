@@ -9,14 +9,13 @@ set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-# Optional: allow log cleanup via flag (safe to remove if you want no-args only)
-CLEAN_LOGS=0
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -c|--clean-logs) CLEAN_LOGS=1 ;;
-        *) echo "Usage: $0 [--clean-logs]" >&2; exit 64 ;;
+# Optional: allow log cleanup via flag or env var
+CLEAR_LOGS="${CLEAR_LOGS:-false}"
+for arg in "$@"; do
+    case "$arg" in
+        --clear-logs) CLEAR_LOGS=true ;;
+        *) echo "Usage: $0 [--clear-logs]" >&2; exit 64 ;;
     esac
-    shift
 done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -45,6 +44,14 @@ if declare -F validate_config >/dev/null 2>&1; then
     validate_config
 fi
 
+# Optionally clear logs when exiting
+if [[ "$CLEAR_LOGS" == "true" ]]; then
+    cleanup_logs_on_exit() {
+        find "$LOG_DIR" "$REPO_ROOT/config/logs" "$REPO_ROOT/scripts/logs" -type f -name '*.txt' -delete 2>/dev/null || true
+    }
+    trap cleanup_logs_on_exit EXIT
+fi
+
 # Core + IO + menu libs
 # shellcheck disable=SC1090
 for lib in core/trace core/deps core/device core/session menu/menu_util menu/header io/apk_utils io/report io/find_latest; do
@@ -63,12 +70,6 @@ init_session
 log_file_init "$LOGFILE"
 
 check_dependencies
-
-# One-time optional cleanup if requested
-if (( CLEAN_LOGS == 1 )); then
-    # Use the existing action to purge partial runs/logs as implemented in your repo
-    cleanup_partial_run || true
-fi
 
 # Resolve device if pre-set or auto-pick single attached device
 if [[ -n "${DEVICE}" ]]; then
