@@ -18,6 +18,13 @@
 set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
+ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# shellcheck disable=SC1090
+source "$ROOT/lib/core/device/wrappers.sh"
+# shellcheck disable=SC1090
+source "$ROOT/lib/core/device/pm.sh"
+# shellcheck disable=SC1090
+source "$ROOT/lib/core/device/fs.sh"
 
 # --- Defaults / knobs ---------------------------------------------------------
 
@@ -193,13 +200,15 @@ run_pm_path_with_fallbacks() {
 # Public: return resolved APK paths for a package (one per line, absolute)
 # Usage: apk_get_paths com.example.app
 apk_get_paths() {
-  local pkg="$1"
-  local raw
-  if ! raw="$(run_pm_path_with_fallbacks "$pkg")"; then
-    LOG_PKG="$pkg" LOG_NOTE="$PM_PATH_TRIES_RC" log WARN "pm path failed"
-    return 1
-  fi
-  printf '%s\n' "$raw" | sanitize_pm_output | sed '/^$/d' | sort -u
+  local pkg="$1" out rc
+  out="$(run_pm_path_with_fallbacks "$pkg")"
+  rc=$?
+  (( rc == 0 )) || {
+    LOG_PKG="$pkg" LOG_NOTE="$PM_PATH_TRIES_RC" LOG_RC="$rc" \
+      log ERROR "pm path failed"
+    return 0
+  }
+  printf '%s\n' "$out" | sanitize_pm_output | sed '/^$/d' | sort -u
 }
 
 # Public: list third-party packages (like `pm list packages -f -3`, but only names)
@@ -402,12 +411,12 @@ apk_paths_describe() {
 # Raw pm path output for a package
 au_pm_path_raw() {
   local pkg="$1"
-  adb_shell pm path "$pkg"
+  pm_path_raw "$pkg"
 }
 
 # Sanitize pm path output (strip leading 'package:')
 au_pm_path_sanitize() {
-  tr -d '\r' | sed -n 's/^package://p'
+  pm_path_sanitize
 }
 
 # Convenience: list sanitized APK paths for a package
@@ -427,7 +436,7 @@ au_pick_base_apk() {
 # Get device file size in bytes
 au_dev_file_size() {
   local path="$1"
-  adb_shell stat -c %s "$path" | tr -d '\r'
+  dev_stat_size "$path"
 }
 
 # Pull one file, echo local path
@@ -481,7 +490,7 @@ au_pkg_meta_csv_line() {
 
 # Package discovery
 au_packages_all() {
-  adb_shell pm list packages | tr -d '\r' | sed -n 's/^package://p'
+  pm_list_pkgs
 }
 
 au_scan_tiktok_family() {

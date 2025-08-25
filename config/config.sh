@@ -95,7 +95,8 @@ REPORT_FORMATS=("txt" "csv" "json")
 
 # Preferred adb binary; override to point at Platform-Tools:
 #   ADB_BIN="$HOME/Android/platform-tools/adb" ./run.sh
-: "${ADB_BIN:="$(command -v adb)"}"
+# Resolve preferred adb binary without failing when missing
+ADB_BIN="${ADB_BIN:-$(command -v adb 2>/dev/null || true)}"
 
 # Timeout for `adb wait-for-device` (seconds)
 : "${ADB_TIMEOUT:=30}"

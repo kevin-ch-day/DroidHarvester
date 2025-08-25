@@ -9,6 +9,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO: $BASH_COMMAND" >&2' ERR
 # Generic error codes
 export E_NO_DEVICE=10
 export E_MULTI_DEVICE=11
+export E_UNAUTHORIZED=16
 export E_DEPS=12
 export E_ADB=13
 export E_IO=14

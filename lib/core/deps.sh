@@ -10,7 +10,9 @@ require() {
     case "$bin" in
         adb) pkg="android-tools";;
     esac
-    command -v "$bin" >/dev/null 2>&1 || die "$E_DEPS" "Missing dependency: $bin (Fedora: sudo dnf install -y $pkg)"
+    if ! command -v "$bin" >/dev/null 2>&1; then
+        die "$E_DEPS" "Missing dependency: $bin (Fedora: sudo dnf install -y $pkg)"
+    fi
 }
 
 # require_all <bins...>

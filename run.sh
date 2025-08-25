@@ -35,10 +35,15 @@ source "$REPO_ROOT/lib/core/logging.sh"
 
 export LOG_LEVEL DH_DEBUG
 
-# Load config
-# shellcheck disable=SC1090
-source "$REPO_ROOT/config.sh"
-validate_config
+# Load all config snippets from config/*.sh
+for f in "$REPO_ROOT"/config/*.sh; do
+    # shellcheck disable=SC1090
+    [[ -r "$f" ]] && source "$f"
+done
+# Validate if helper exists
+if declare -F validate_config >/dev/null 2>&1; then
+    validate_config
+fi
 
 # Core + IO + menu libs
 # shellcheck disable=SC1090
@@ -112,8 +117,9 @@ while true; do
         "Export report bundle" \
         "Resume last session" \
         "Clean up partial run" \
+        "Clear logs/results" \
         "Exit"
-    choice=$(read_choice 12)
+    choice=$(read_choice 13)
 
     case $choice in
         1) choose_device ;;
@@ -127,7 +133,8 @@ while true; do
         9) export_report ;;
         10) resume_last_session ;;
         11) cleanup_partial_run ;;
-        12) LOG_COMP="core" log INFO "Exiting DroidHarvester."; exit 0 ;;
+        12) cleanup_all_artifacts ;;
+        13) LOG_COMP="core" log INFO "Exiting DroidHarvester."; exit 0 ;;
     esac
 
     draw_menu_footer
