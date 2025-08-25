@@ -27,6 +27,33 @@ Artifacts and logs are written under `results/<serial>/` and `logs/` by default.
 Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and
 `scripts/adb_health.sh`, both of which reuse the core helpers.
 
+Use `scripts/cleanup_outputs.sh` or the "Clear logs/results" menu option to
+remove all previous artifacts and start fresh.
+
+## Diagnostics
+
+```bash
+cd scripts
+./adb_health.sh
+./adb_apk_diag.sh com.zhiliaoapp.musically   # writes results/<DEVICE>/manual_diag_<ts>
+```
+
+Configuration values are now loaded from `config/*.sh` rather than a single `config.sh`.
+
+## Using device helper modules
+
+To write scripts that interact with a device:
+
+```bash
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/core/device/env.sh"
+source "$ROOT/lib/core/device/select.sh"
+source "$ROOT/lib/core/device/wrappers.sh"
+source "$ROOT/lib/core/device/pm.sh"
+```
+
+
 ## Device selection
 
 DroidHarvester auto-detects a single connected device and normalizes the
@@ -84,6 +111,10 @@ The behaviour of pull helpers can be tuned with environment variables:
 | `DH_DRY_RUN=1` | Show planned actions without pulling files. |
 | `DH_INCLUDE_SPLITS=0` | Pull only base APKs, skip splits. |
 | `DH_VERIFY_PULL=0` | Skip SHA256 verification of pulled files. |
+| `DH_SHELL_TIMEOUT` | Seconds for adb shell ops (default 15). |
+| `DH_PULL_TIMEOUT` | Seconds for adb pull (default 60). |
+| `DH_RETRIES` | Retry count for ADB commands (default 3). |
+| `DH_BACKOFF` | Seconds between retries (default 1). |
 
 ## Tests
 
