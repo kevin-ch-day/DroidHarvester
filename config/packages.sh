@@ -16,3 +16,23 @@ if [[ -f "$CUSTOM_PACKAGES_FILE" ]]; then
   done < "$CUSTOM_PACKAGES_FILE"
 fi
 
+# Friendly name mappings for quick pull results
+declare -A FRIENDLY_DIR_MAP=(
+  [com.facebook.katana]=facebook_app
+  [com.facebook.orca]=messenger
+  [com.whatsapp]=whatsapp
+  [com.twitter.android]=twitter
+  [com.instagram.android]=instagram
+  [com.snapchat.android]=snapchat
+  [com.zhiliaoapp.musically]=tiktok
+)
+declare -A FRIENDLY_FILE_MAP=(
+  [com.facebook.katana]=facebook_app
+  [com.facebook.orca]=messenger_app
+  [com.whatsapp]=whatsapp_app
+  [com.twitter.android]=twitter_app
+  [com.instagram.android]=instagram_app
+  [com.snapchat.android]=snapchat_app
+  [com.zhiliaoapp.musically]=tiktok_app
+)
+

@@ -12,7 +12,6 @@ REPO_ROOT="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
 
 # --- Config sourcing (tolerate split or monolithic) ---
 try_source() { [[ -r "$1" ]] && source "$1" >/dev/null 2>&1 || true; } # shellcheck disable=SC1091
-try_source "$REPO_ROOT/config.sh"
 try_source "$REPO_ROOT/config/config.sh"
 try_source "$REPO_ROOT/config/paths.sh"
 
