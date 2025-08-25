@@ -4,7 +4,7 @@ TARGET_PACKAGES=(
   "com.facebook.katana"         # Facebook
   "com.facebook.orca"           # Messenger
   "com.snapchat.android"        # Snapchat
-  "com.twitter.android"         # Twitter/X
+  "com.twitter.android"         # Twitter
   "com.instagram.android"       # Instagram
   "com.whatsapp"                # WhatsApp
 )

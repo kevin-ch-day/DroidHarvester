@@ -76,27 +76,35 @@ declare -A _DEFAULT_FILE_MAP=(
   [com.whatsapp]=whatsapp_app
 )
 
-to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_.' '_' ; }
+validate_name() {
+  local raw="$1" lower
+  lower="${raw,,}"
+  if [[ "$lower" =~ [^a-z0-9_.-] ]]; then
+    echo "[FATAL] Unsafe name '$raw'" >&2
+    exit 1
+  fi
+  printf '%s' "$lower"
+}
 
-# Pick value from user map if defined, else default, else safe(pkg)
+# Pick value from user map if defined, else default, else pkg
 friendly_dir_for() {
   local pkg="$1"
   if declare -p FRIENDLY_DIR_MAP >/dev/null 2>&1 && [[ -n "${FRIENDLY_DIR_MAP[$pkg]+x}" ]]; then
-    echo "${FRIENDLY_DIR_MAP[$pkg]}"
+    printf '%s' "${FRIENDLY_DIR_MAP[$pkg]}"
   elif [[ -n "${_DEFAULT_DIR_MAP[$pkg]+x}" ]]; then
-    echo "${_DEFAULT_DIR_MAP[$pkg]}"
+    printf '%s' "${_DEFAULT_DIR_MAP[$pkg]}"
   else
-    to_safe "$pkg"
+    printf '%s' "$pkg"
   fi
 }
 friendly_file_for() {
   local pkg="$1"
   if declare -p FRIENDLY_FILE_MAP >/dev/null 2>&1 && [[ -n "${FRIENDLY_FILE_MAP[$pkg]+x}" ]]; then
-    echo "${FRIENDLY_FILE_MAP[$pkg]}"
+    printf '%s' "${FRIENDLY_FILE_MAP[$pkg]}"
   elif [[ -n "${_DEFAULT_FILE_MAP[$pkg]+x}" ]]; then
-    echo "${_DEFAULT_FILE_MAP[$pkg]}"
+    printf '%s' "${_DEFAULT_FILE_MAP[$pkg]}"
   else
-    to_safe "$pkg"
+    printf '%s' "$pkg"
   fi
 }
 
@@ -130,8 +138,8 @@ for pkg_dir in "$SRC_ROOT"/*; do
   [[ -d "$pulled" ]] || pulled="$(find "$pkg_dir" -maxdepth 2 -type d -name 'pulled' | head -1 || true)"
   [[ -d "$pulled" ]] || continue
 
-  app_dir="$(friendly_dir_for "$pkg")"
-  file_base="$(friendly_file_for "$pkg")"
+  app_dir="$(validate_name "$(friendly_dir_for "$pkg")")"
+  file_base="$(validate_name "$(friendly_file_for "$pkg")")"
   dst_app_dir="$DST_ROOT/$app_dir"
   mkdir -p "$dst_app_dir"
 
@@ -147,20 +155,21 @@ for pkg_dir in "$SRC_ROOT"/*; do
     apk_role="split"
     out_name="$file_base"
 
-    if [[ "$bn" == "base.apk" ]]; then
-      apk_role="base"
-      [[ -n "$vname" || -n "$vcode" ]] && out_name="${out_name}_v${vname:-NA}_${vcode:-NA}"
-      out_file="${out_name}.apk"
-    elif [[ "$bn" == split_*.apk ]]; then
-      suffix="${bn#split_}"
-      out_file="${out_name}_$suffix"
-    else
-      out_file="${out_name}_${bn}"
-    fi
+      if [[ "$bn" == "base.apk" ]]; then
+        apk_role="base"
+        [[ -n "$vname" || -n "$vcode" ]] && out_name="${out_name}_v${vname:-NA}_${vcode:-NA}"
+        out_file="${out_name}.apk"
+      elif [[ "$bn" == split_*.apk ]]; then
+        suffix="${bn#split_}"
+        out_file="${out_name}_$suffix"
+      else
+        out_file="${out_name}_${bn}"
+      fi
 
-    dst="$dst_app_dir/$out_file"
-    dst="$(unique_dest "$dst")"
-    cp -f "$src_apk" "$dst"
+      out_file="$(validate_name "$out_file")"
+      dst="$dst_app_dir/$out_file"
+      dst="$(unique_dest "$dst")"
+      cp -f "$src_apk" "$dst"
     ((changed+=1))
 
     bytes="$(stat -c %s "$dst" 2>/dev/null || wc -c < "$dst")"
