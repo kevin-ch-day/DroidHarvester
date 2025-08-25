@@ -82,7 +82,12 @@ assert_device_ready "$DEVICE"
 # ---- Working dirs ------------------------------------------------------------
 TS="$(date +%Y%m%d_%H%M%S)"
 PKG_ESC="${PKG//./_}"
-to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_'; }
+to_safe() {
+  local s
+  s=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_')
+  s=$(echo "$s" | tr -s '_' | sed 's/^_//; s/_$//')
+  echo "$s"
+}
 DEVICE_VENDOR="$(adb -s "$DEVICE" shell getprop ro.product.manufacturer | tr -d '\r')"
 DEVICE_MODEL="$(adb -s "$DEVICE" shell getprop ro.product.model | tr -d '\r')"
 safe_vendor="$(to_safe "$DEVICE_VENDOR")"

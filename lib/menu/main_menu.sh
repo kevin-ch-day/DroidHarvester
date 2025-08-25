@@ -18,8 +18,11 @@ render_main_menu() {
     fi
 
     draw_menu_header "$title" "$device" "$last_report"
-    printf " ${WHITE}Harvested${NC}: found ${YELLOW}%s${NC} / pulled ${YELLOW}%s${NC} | Targets: ${YELLOW}%s${NC} default / ${YELLOW}%s${NC} custom | Latest: %s\n" \
-        "${PKGS_FOUND:-0}" "${PKGS_PULLED:-0}" "${#TARGET_PACKAGES[@]}" "$custom_count" "${QUICK_PULL_DIR:-n/a}"
+    local f_col="$YELLOW" p_col="$YELLOW"
+    (( PKGS_FOUND > 0 )) && f_col="$GREEN"
+    (( PKGS_PULLED > 0 )) && p_col="$GREEN"
+    printf " ${WHITE}Harvested${NC}: found %s%s%s / pulled %s%s%s | Targets: ${CYAN}%s${NC} default / ${CYAN}%s${NC} custom | Latest: %s\n" \
+        "$f_col" "${PKGS_FOUND:-0}" "$NC" "$p_col" "${PKGS_PULLED:-0}" "$NC" "${#TARGET_PACKAGES[@]}" "$custom_count" "${QUICK_PULL_DIR:-n/a}"
     echo
     show_menu \
         "Choose device" \

@@ -25,10 +25,10 @@ show_menu() {
             echo
             continue
         fi
-        printf "  ${YELLOW}[%2d]${NC} ${WHITE}%s${NC}\n" "$i" "$option"
+        printf "  ${CYAN}[%2d]${NC} ${WHITE}%s${NC}\n" "$i" "$option"
         ((i++))
     done
-    printf "  ${YELLOW}[ 0]${NC} ${GRAY}Exit${NC}\n"
+    printf "  ${CYAN}[ 0]${NC} ${GRAY}Exit${NC}\n"
     echo "${CYAN}$(ui_line "$UI_H1")${NC}"
 }
 

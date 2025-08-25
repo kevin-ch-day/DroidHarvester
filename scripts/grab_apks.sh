@@ -31,7 +31,12 @@ SERIAL="$("$ADB_BIN" get-serialno 2>/dev/null || true)"
 [[ -n "$SERIAL" && "$SERIAL" != "unknown" ]] || { log ERROR "no device"; exit 3; }
 ADB_S=(-s "$SERIAL")
 
-to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_'; }
+to_safe() {
+  local s
+  s=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_')
+  s=$(echo "$s" | tr -s '_' | sed 's/^_//; s/_$//')
+  echo "$s"
+}
 
 DEVICE_VENDOR="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.product.manufacturer | tr -d '\r')"
 DEVICE_MODEL="$("$ADB_BIN" "${ADB_S[@]}" shell getprop ro.product.model | tr -d '\r')"

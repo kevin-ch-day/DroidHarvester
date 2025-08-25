@@ -83,8 +83,24 @@ ensure_device_selected() {
   fi
 }
 
+update_quickpull_stats() {
+  local man
+  [[ -n "$DEVICE_DIR" ]] || return
+  man="$DEVICE_DIR/quick_pull_results/manifest.csv"
+  if [[ -f "$man" ]]; then
+    QUICK_PULL_DIR="$(basename "$(dirname "$man")")"
+    PKGS_FOUND=$(tail -n +2 "$man" | cut -d, -f3 | sort -u | wc -l | tr -d ' ')
+    PKGS_PULLED=$(( $(wc -l < "$man" | tr -d ' ') - 1 ))
+  else
+    QUICK_PULL_DIR="n/a"
+    PKGS_FOUND=0
+    PKGS_PULLED=0
+  fi
+}
+
 # --- Main loop ---
 while true; do
+  update_quickpull_stats
   LAST_TXT_REPORT="$(latest_report || true)"
   header_report=""
   [[ -n "$LAST_TXT_REPORT" ]] && header_report="$(basename "$LAST_TXT_REPORT")"
@@ -107,12 +123,7 @@ while true; do
         if [[ -x "$REPO_ROOT/scripts/finalize_quickpull.sh" ]]; then
           echo "[INFO] Finalizing quick pull (friendly names + manifest)..."
           "$REPO_ROOT/scripts/finalize_quickpull.sh" || true
-          qdir="$DEVICE_DIR/quick_pull_results"
-          if [[ -f "$qdir/manifest.csv" ]]; then
-            QUICK_PULL_DIR="$(basename "$qdir")"
-            PKGS_FOUND=$(tail -n +2 "$qdir/manifest.csv" | cut -d, -f3 | sort -u | wc -l | tr -d ' ')
-            PKGS_PULLED=$(( $(wc -l < "$qdir/manifest.csv" | tr -d ' ') - 1 ))
-          fi
+          update_quickpull_stats
         fi
       else
         LOG_COMP="core" log WARN "scripts/grab_apks.sh missing or not executable."
