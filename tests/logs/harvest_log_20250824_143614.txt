@@ -1,0 +1,4 @@
+[INFO] [14:36:14] adb get-state | ts=2025-08-24T19:36:14Z lvl=INFO sid= - code= - comp=adb func= - dev=ZY22JK89DR pkg= - apk= - dur_ms= - attempts= - rc= - msg="adb get-state"
+[INFO] [14:36:14] adb -s ZY22JK89DR shell echo OK | ts=2025-08-24T19:36:14Z lvl=INFO sid= - code= - comp=adb func= - dev=ZY22JK89DR pkg= - apk= - dur_ms= - attempts= - rc= - msg="adb -s ZY22JK89DR shell echo OK"
+[INFO] [14:36:14] device df | ts=2025-08-24T19:36:14Z lvl=INFO sid= - code= - comp=adb func= - dev=ZY22JK89DR pkg= - apk= - dur_ms= - attempts= - rc= - msg="device df"
+[INFO] [14:36:14] host df | ts=2025-08-24T19:36:14Z lvl=INFO sid= - code= - comp=host func= - dev=ZY22JK89DR pkg= - apk= - dur_ms= - attempts= - rc= - msg="host df"
