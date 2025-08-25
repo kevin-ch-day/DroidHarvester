@@ -29,11 +29,11 @@ cleanup_partial_run() {
 
 # Remove all logs and results directories
 cleanup_all_artifacts() {
-    read -rp "Remove all contents of $RESULTS_DIR and $LOG_DIR? [y/N]: " ans
+    read -rp "Remove all contents of $RESULTS_DIR and $LOG_ROOT? [y/N]: " ans
     case "$ans" in
         [Yy]*)
-            rm -rf "$RESULTS_DIR"/* "$LOG_DIR"/* 2>/dev/null || true
-            log SUCCESS "Cleared $RESULTS_DIR and $LOG_DIR"
+            rm -rf "$RESULTS_DIR"/* "$LOG_ROOT"/* 2>/dev/null || true
+            log SUCCESS "Cleared $RESULTS_DIR and $LOG_ROOT"
             ;;
         *)
             log WARN "Cleanup cancelled." ;;

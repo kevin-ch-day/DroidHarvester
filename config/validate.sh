@@ -30,7 +30,9 @@ validate_config() {
     _config_warn "ADB_BIN not set or not executable ($ADB_BIN)"
   fi
 
-  export REPO_ROOT SCRIPT_DIR RESULTS_DIR LOG_DIR TIMESTAMP_FORMAT
+  export REPO_ROOT SCRIPT_DIR RESULTS_DIR LOG_ROOT TIMESTAMP_FORMAT
+  # Backwards compatibility for callers still using LOG_DIR
+  export LOG_DIR="$LOG_ROOT"
   export LOG_KEEP_N CLEAR_LOGS
   export ADB_BIN ADB_TIMEOUT ALLOW_MULTI_DEVICE DH_USER_ID
   export DH_SHELL_TIMEOUT DH_PULL_TIMEOUT DH_RETRIES DH_BACKOFF

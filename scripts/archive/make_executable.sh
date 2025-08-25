@@ -7,8 +7,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/logs"
-mkdir -p "$LOG_DIR"
+: "${LOG_ROOT:="$REPO_ROOT/logs"}"
+LOG_DIR="$LOG_ROOT"  # Backwards compatibility
+mkdir -p "$LOG_ROOT"
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config/config.sh"
@@ -35,7 +36,7 @@ done
 
 FILES=("$@")
 
-LOG_FILE="$LOG_DIR/make_executable_$(date +%Y%m%d_%H%M%S).txt"
+LOG_FILE="$LOG_ROOT/make_executable_$(date +%Y%m%d_%H%M%S).txt"
 log_file_init "$LOG_FILE"
 
 if (( ${#FILES[@]} == 0 )); then

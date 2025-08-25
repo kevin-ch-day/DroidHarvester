@@ -9,8 +9,9 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 init_session() {
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     RESULTS_DIR="${RESULTS_DIR:-$REPO_ROOT/results}"
-    LOG_DIR="${LOG_DIR:-$REPO_ROOT/logs}"
-    mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+    LOG_ROOT="${LOG_ROOT:-$REPO_ROOT/logs}"
+    LOG_DIR="$LOG_ROOT"  # Backwards compatibility
+    mkdir -p "$RESULTS_DIR" "$LOG_ROOT"
     logging_rotate
     RESULTS_RETENTION_DAYS=${RESULTS_RETENTION_DAYS:-30}
     find "$RESULTS_DIR" -mindepth 1 -mtime +"$RESULTS_RETENTION_DAYS" -print -delete 2>/dev/null || true
@@ -40,7 +41,8 @@ init_session() {
     LAST_TXT_REPORT=""
     DEVICE_FINGERPRINT=""
     SESSION_ID="$TIMESTAMP"
-    export DEVICE_FINGERPRINT SESSION_ID LOGFILE RESULTS_DIR LOG_DIR REPORT JSON_REPORT TXT_REPORT
+    export DEVICE_FINGERPRINT SESSION_ID LOGFILE RESULTS_DIR LOG_ROOT REPORT JSON_REPORT TXT_REPORT
+    export LOG_DIR="$LOG_ROOT"
 }
 
 session_metadata() {

@@ -15,12 +15,13 @@ NC="\033[0m"
 
 : "${LOG_LEVEL:=INFO}"
 : "${REPO_ROOT:="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"}"
-: "${LOG_DIR:="${LOG_ROOT:-$REPO_ROOT/logs}"}"
+: "${LOG_ROOT:="$REPO_ROOT/logs"}"
+LOG_DIR="$LOG_ROOT"  # Backwards compatibility
 
 logging_init() {
-    mkdir -p "$LOG_DIR"
+    mkdir -p "$LOG_ROOT"
     if [[ "${CLEAR_LOGS:-false}" == true ]]; then
-        rm -f "$LOG_DIR"/*.txt 2>/dev/null || true
+        rm -f "$LOG_ROOT"/*.txt 2>/dev/null || true
     fi
     logging_rotate
     if [[ -z "${LOGFILE:-}" ]]; then
@@ -32,7 +33,7 @@ _log_path() {
     local prefix="$1"
     local ts="$(date +%Y%m%d_%H%M%S)"
     local epoch="$(date +%s)"
-    echo "$LOG_DIR/${prefix}_${ts}_${epoch}.txt"
+    echo "$LOG_ROOT/${prefix}_${ts}_${epoch}.txt"
 }
 
 _log_print() {
@@ -46,7 +47,7 @@ _log_err()  { _log_print ERR  "$@"; }
 logging_rotate() {
     local keep="${LOG_KEEP_N:-}"
     [[ -n "$keep" && "$keep" =~ ^[0-9]+$ ]] || return 0
-    mapfile -t _files < <(ls -1t "$LOG_DIR"/*.txt 2>/dev/null || true)
+    mapfile -t _files < <(ls -1t "$LOG_ROOT"/*.txt 2>/dev/null || true)
     (( ${#_files[@]} > keep )) || return 0
     for f in "${_files[@]:$keep}"; do
         rm -f "$f"

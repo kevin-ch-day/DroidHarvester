@@ -22,7 +22,7 @@ Typical workflow:
 2. Choose **Scan for target apps** to detect installed packages.
 3. Choose **Harvest** to pull APK splits and metadata for discovered apps.
 
-Artifacts and logs are written under `results/<serial>/` and `logs/` by default.
+Artifacts and logs are written under `results/<serial>/` and `$LOG_ROOT` (default `logs/`) by default.
 
 After `[4] Quick APK Harvest`, friendly copies are normalized under
 `results/<serial>/quick_pull_results/`. Each app gets a human-friendly
@@ -148,13 +148,13 @@ tests/run.sh
 
 ## Repo Conventions
 
-- All logs are stored under `./logs/`.
+- All logs are stored under `$LOG_ROOT` (default `./logs/`).
 - `scripts/` contains ad-hoc utilities; production code in `lib/` and `run.sh`
   must not source from it.
 - `tests/` holds canonical tests and guards.
 
 ### Environment variables
 
-- `LOG_DIR` – base directory for logs (defaults to `./logs`; `LOG_ROOT` is a deprecated alias).
+- `LOG_ROOT` – base directory for logs (defaults to `./logs`).
 - `LOG_KEEP_N` – if set to an integer, retain only that many recent log files.
 - `CLEAR_LOGS` – set to `true` to delete existing logs at startup.

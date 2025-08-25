@@ -12,9 +12,10 @@ REPO_ROOT="$(cd "
 $(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/logs"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/static_check_$(date +%Y%m%d_%H%M%S).txt"
+: "${LOG_ROOT:="$REPO_ROOT/logs"}"
+LOG_DIR="$LOG_ROOT"  # Backwards compatibility
+mkdir -p "$LOG_ROOT"
+LOG_FILE="$LOG_ROOT/static_check_$(date +%Y%m%d_%H%M%S).txt"
 
 echo "Static analysis log: $LOG_FILE"
 
