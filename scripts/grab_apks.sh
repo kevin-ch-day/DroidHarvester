@@ -124,8 +124,13 @@ pull_one_pkg() {
   done <<< "$paths"
 
   if compgen -G "$pulled/*.apk" >/dev/null; then
-    ( cd "$pulled"
-      if command -v sha256sum >/devnull 2>&1; then sha256sum *.apk > hashes.sha256; else shasum -a 256 *.apk > hashes.sha256; fi
+    (
+      cd "$pulled"
+      if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum *.apk > hashes.sha256
+      else
+        shasum -a 256 *.apk > hashes.sha256
+      fi
     ) || true
   fi
 
