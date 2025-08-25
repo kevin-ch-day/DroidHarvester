@@ -24,6 +24,7 @@ fi
 "$ROOT/tests/guards/no_root_config_imports.sh"
 "$ROOT/tests/guards/no_legacy_log_paths.sh"
 "$ROOT/tests/integration/log_write_selftest.sh"
+"$ROOT/tests/integration/finalize_quickpull_test.sh"
 
 # Load helpers
 # shellcheck disable=SC1090

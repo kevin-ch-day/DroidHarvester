@@ -15,20 +15,12 @@ try_source() { [[ -r "$1" ]] && source "$1" >/dev/null 2>&1 || true; } # shellch
 try_source "$REPO_ROOT/config/config.sh"
 try_source "$REPO_ROOT/config/paths.sh"
 
-# --- Candidate log dirs (prefer configured LOG_ROOT if present) ---
-CAND_LOG_DIRS=()
-[[ -n "${LOG_ROOT:-}" ]] && CAND_LOG_DIRS+=("$LOG_ROOT")
-CAND_LOG_DIRS+=("$REPO_ROOT/log" "$REPO_ROOT/logs")
-
+# --- Locate latest quick pull log under configured LOG_DIR ---
 pick_newest_log() {
-  local d
-  for d in "${CAND_LOG_DIRS[@]}"; do
-    [[ -d "$d" ]] || continue
-    compgen -G "$d/apk_grab_*.txt" >/dev/null || continue
-    ls -1t "$d"/apk_grab_*.txt | head -1
-    return 0
-  done
-  return 1
+  local d="${LOG_DIR:-$REPO_ROOT/logs}"
+  [[ -d "$d" ]] || return 1
+  compgen -G "$d/apk_grab_*.txt" >/dev/null || return 1
+  ls -1t "$d"/apk_grab_*.txt | head -1
 }
 
 # --- Determine OUT (quick_pull folder) ---

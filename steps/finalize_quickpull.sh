@@ -150,7 +150,7 @@ for pkg_dir in "$SRC_ROOT"/*; do
     dst="$dst_app_dir/$out_file"
     dst="$(unique_dest "$dst")"
     cp -f "$src_apk" "$dst"
-    ((changed++))
+    ((changed+=1))
 
     bytes="$(stat -c %s "$dst" 2>/dev/null || wc -c < "$dst")"
     hash="$(sha256_host "$dst")"
