@@ -30,16 +30,14 @@ fi
 
 # Results & logs live at repo root by default
 : "${RESULTS_DIR:="${REPO_ROOT}/results"}"
-: "${LOG_DIR:="${REPO_ROOT}/logs"}"
+: "${LOG_ROOT:="${REPO_ROOT}/log"}"
+LOG_DIR="${LOG_DIR:-$LOG_ROOT}"
 
 # Timestamp format for log and report files (passed directly to `date`)
 : "${TIMESTAMP_FORMAT:="+%Y%m%d_%H%M%S"}"
 
 # Ensure base dirs exist (harmless if already present)
-mkdir -p "${RESULTS_DIR}" "${LOG_DIR}"
-
-# Automatically purge logs after run.sh exits (1 to enable)
-: "${CLEAN_LOGS:=0}"
+mkdir -p "${RESULTS_DIR}" "${LOG_ROOT}"
 
 # ===============================
 # II. TARGET PACKAGES
@@ -162,7 +160,7 @@ validate_config() {
 
   export ADB_BIN ADB_TIMEOUT ALLOW_MULTI_DEVICE
   export DH_SHELL_TIMEOUT DH_PULL_TIMEOUT DH_RETRIES DH_BACKOFF
-  export RESULTS_DIR LOG_DIR REPO_ROOT SCRIPT_DIR TIMESTAMP_FORMAT
+  export RESULTS_DIR LOG_ROOT LOG_DIR REPO_ROOT SCRIPT_DIR TIMESTAMP_FORMAT
   export LOG_LEVEL INCLUDE_DEVICE_PROFILE INCLUDE_ENV_METADATA
 }
 

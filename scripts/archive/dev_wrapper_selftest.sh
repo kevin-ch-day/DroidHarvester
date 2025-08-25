@@ -9,7 +9,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/logs"
+LOG_DIR="$REPO_ROOT/log"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/wrappers_selftest_$(date +%Y%m%d_%H%M%S).txt"
 

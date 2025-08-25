@@ -4,13 +4,18 @@ set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO" >&2' ERR
 
 device_list_connected() {
-  adb devices | awk 'NR>1 && $2=="device" {print $1}' | tr -d '\r' | xargs -n1
+  adb devices | awk 'NR>1 && $2=="device" {print $1}' | tr -d '\r'
 }
 
 device_pick_or_fail() {
-  local specified="${1:-}"
+  local specified="${1:-}" adb_out unauthorized
   specified="$(normalize_serial "$specified")"
-  mapfile -t devs < <(device_list_connected)
+  adb_out="$(adb devices 2>/dev/null)"
+  unauthorized=$(printf '%s\n' "$adb_out" | awk '/unauthorized/ {print $1}')
+  if [[ -n "$unauthorized" ]]; then
+    die "$E_UNAUTHORIZED" "device '$unauthorized' unauthorized"
+  fi
+  mapfile -t devs < <(printf '%s\n' "$adb_out" | awk 'NR>1 && $2=="device" {print $1}' | tr -d '\r')
   if [[ -n "$specified" ]]; then
     if printf '%s\n' "${devs[@]}" | grep -Fxq "$specified"; then
       echo "$specified"
@@ -21,7 +26,7 @@ device_pick_or_fail() {
   if (( ${#devs[@]} == 0 )); then
     die "$E_NO_DEVICE" "No devices detected"
   elif (( ${#devs[@]} > 1 )); then
-    die "$E_MULTI_DEVICE" "Multiple devices detected; use --device"
+    die "$E_MULTI_DEVICE" "multiple devices detected; use --device"
   fi
   echo "${devs[0]}"
 }

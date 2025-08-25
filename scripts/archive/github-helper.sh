@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/logs"
+LOG_DIR="$REPO_ROOT/log"
 mkdir -p "$LOG_DIR"
 
 # shellcheck disable=SC1090

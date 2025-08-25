@@ -14,12 +14,40 @@ CYAN="\033[0;36m"
 NC="\033[0m"
 
 : "${LOG_LEVEL:=INFO}"
-: "${SCRIPT_DIR:=$(pwd)}"
-LOGS_DIR="${LOGS_DIR:-$SCRIPT_DIR/logs}"
-mkdir -p "$LOGS_DIR"
+: "${REPO_ROOT:="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"}"
+: "${SCRIPT_DIR:="$REPO_ROOT"}"
+: "${LOG_DIR:="$REPO_ROOT/log"}"
+LOG_ROOT="${LOG_ROOT:-$LOG_DIR}"
+LOGS_DIR="$LOG_DIR"
+mkdir -p "$LOG_DIR"
+
+_log_path() {
+    local prefix="$1"
+    local ts="$(date +%Y%m%d_%H%M%S)"
+    local epoch="$(date +%s)"
+    echo "$LOG_DIR/${prefix}_${ts}_${epoch}.txt"
+}
+
+_log_print() {
+    local lvl="$1"; shift
+    printf '[%s][%s] %s\n' "$lvl" "$(date +%H:%M:%S)" "$*" >&2
+}
+_log_info() { _log_print INFO "$@"; }
+_log_warn() { _log_print WARN "$@"; }
+_log_err()  { _log_print ERR  "$@"; }
+
+logging_rotate() {
+    local keep="${LOG_KEEP_N:-}"
+    [[ -n "$keep" && "$keep" =~ ^[0-9]+$ ]] || return 0
+    mapfile -t _files < <(ls -1t "$LOG_DIR"/*.txt 2>/dev/null || true)
+    (( ${#_files[@]} > keep )) || return 0
+    for f in "${_files[@]:$keep}"; do
+        rm -f "$f"
+    done
+}
+
 if [[ -z "${LOGFILE:-}" ]]; then
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    LOGFILE="$LOGS_DIR/harvest_log_$TIMESTAMP.txt"
+    LOGFILE="$(_log_path harvest_log)"
 fi
 
 # Initialize logging to a specific file

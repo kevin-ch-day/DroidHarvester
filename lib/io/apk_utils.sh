@@ -271,31 +271,34 @@ file_sha256() {
 
 # Pull with retry, falling back to device-side copy on permission errors
 run_adb_pull_with_fallbacks() {
-  local src="$1" dst="$2" rc tmp
-  local __old_err_trap; __old_err_trap="$(trap -p ERR || true)"
-  trap - ERR
-  set +e
+    local src="$1" dst="$2" rc tmp
+    local __old_err_trap; __old_err_trap="$(trap -p ERR || true)"
+    trap - ERR
+    set +e
 
-  log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $src $dst"
-  timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$src" "$dst" >>"$LOGFILE" 2>&1
-  rc=$?
-  if (( rc != 0 )); then
-    LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying exec-out fallback"
-    timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" exec-out cat "$src" >"$dst" 2>>"$LOGFILE"
+    mkdir -p "$(dirname "$dst")"
+
+    log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $src $dst"
+    timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$src" "$dst" >>"$LOGFILE" 2>&1
     rc=$?
-  fi
-  if (( rc != 0 )); then
-    LOG_APK="$(basename "$dst")" log WARN "exec-out fallback failed; trying copy fallback"
-    tmp="/data/local/tmp/$(basename "$dst")"
-    if adb_shell cp "$src" "$tmp" >/dev/null 2>&1; then
-      log DEBUG "cmd: adb ${ADB_ARGS[*]} exec-out cat $tmp > $dst"
-      timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" exec-out cat "$tmp" >"$dst" 2>>"$LOGFILE"
+    if (( rc != 0 )); then
+      LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying exec-out fallback"
+      timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" exec-out cat "$src" >"$dst" 2>>"$LOGFILE"
       rc=$?
-      adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
-    else
-      LOG_APK="$(basename "$dst")" log WARN "device-side copy failed"
+      if (( rc != 0 )) || [[ ! -s "$dst" ]]; then
+        LOG_APK="$(basename "$dst")" log WARN "exec-out fallback failed; trying copy fallback"
+        tmp="/data/local/tmp/$(basename "$dst")"
+        if adb_shell cp "$src" "$tmp" >/dev/null 2>&1; then
+          log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $tmp $dst"
+          timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$tmp" "$dst" >>"$LOGFILE" 2>&1
+          rc=$?
+          [[ -s "$dst" ]] || rc=1
+          adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
+        else
+          LOG_APK="$(basename "$dst")" log WARN "device-side copy failed"
+        fi
+      fi
     fi
-  fi
 
   set -e
   [[ -n "$__old_err_trap" ]] && eval "$__old_err_trap" || true
