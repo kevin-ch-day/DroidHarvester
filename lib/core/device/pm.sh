@@ -2,33 +2,32 @@
 # lib/core/device/pm.sh
 # ADB package-manager helpers (soft-fail; multi-user aware)
 set -euo pipefail
-set -E
-trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO" >&2' ERR
+# No ERR trap here: PM probes must stay quiet even on expected misses
 
 # --- internal: run a command with ERR trap disabled and errexit off -----------
 _pm_run_quiet() {
-  # Usage: _pm_run_quiet <outvar> -- <cmd...>
-  # Captures stdout into <outvar>; returns the command's rc.
-  local __outvar=$1; shift
+  # Usage: _pm_run_quiet <outvar> <rcvar> -- <cmd...>
+  # Captures stdout into <outvar> and exit code into <rcvar>; always returns 0.
+  local __outvar=$1 __rcvar=$2; shift 2
   [[ "${1:-}" == "--" ]] && shift || { echo "[pm] missing -- in _pm_run_quiet" >&2; return 127; }
 
-  # Save current ERR trap and disable temporarily
   local __old_err_trap
   __old_err_trap="$(trap -p ERR || true)"
   trap - ERR
 
-  # Run with errexit off
   set +e
   local __out __rc
   __out="$("$@" 2>/dev/null)"
   __rc=$?
   set -e
 
-  # Restore the previous ERR trap if any
+  printf -v "$__outvar" '%s' "$__out"
+  printf -v "$__rcvar" '%s' "$__rc"
+
+  # Restore the previous ERR trap if any (after capturing results)
   [[ -n "$__old_err_trap" ]] && eval "$__old_err_trap" || true
 
-  printf -v "$__outvar" '%s' "$__out"
-  return "$__rc"
+  return 0
 }
 
 # --- internal: optional --user argument for multi-user aware commands ---------
@@ -52,9 +51,10 @@ pm_path_raw() {
   fi
   args+=("$pkg")
 
-  _pm_run_quiet out -- adb_shell "${args[@]}"
-  rc=$?
-  (( rc != 0 )) && return 0
+  _pm_run_quiet out rc -- adb_shell "${args[@]}"
+  if (( rc != 0 )); then
+    return 0
+  fi
 
   printf '%s\n' "$out" | tr -d '\r'
 }
@@ -94,9 +94,10 @@ pm_list_pkgs() {
     args+=(--user "$DH_USER_ID")
   fi
 
-  _pm_run_quiet out -- adb_shell "${args[@]}"
-  rc=$?
-  (( rc != 0 )) && return 0
+  _pm_run_quiet out rc -- adb_shell "${args[@]}"
+  if (( rc != 0 )); then
+    return 0
+  fi
 
   out="$(printf '%s\n' "$out" | tr -d '\r' | sed -n 's/^package://p')"
   if [[ -n "$pattern" ]]; then
