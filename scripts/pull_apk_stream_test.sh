@@ -14,11 +14,12 @@ DEV="${2:-${DEV:-}}"
 ADB_BIN="${ADB_BIN:-$(command -v adb)}"
 DH_PULL_TIMEOUT="${DH_PULL_TIMEOUT:-}"   # seconds; if set and non-zero we use `timeout`
 OUTDIR="${OUTDIR:-/tmp/dh_pull_test}"
-LOGDIR="${LOGDIR:-./logs/diag}"
-mkdir -p "$OUTDIR" "$LOGDIR"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1090
+source "$ROOT/lib/core/logging.sh"
+mkdir -p "$OUTDIR"
 
-TS="$(date +%Y%m%d_%H%M%S)"
-LOGFILE="$LOGDIR/pull_stream_${PKG//./_}_${TS}.log"
+LOGFILE="${LOGFILE:-$(_log_path pull_stream_${PKG//./_})}"
 
 # -----------------------------
 # Helpers
@@ -93,7 +94,8 @@ if [[ -n "$DH_PULL_TIMEOUT" && "$DH_PULL_TIMEOUT" != "0" ]]; then
   log "Using pull timeout: $DH_PULL_TIMEOUT"
 fi
 
-if maybe_timeout "pull" "$ADB_BIN" -s "$DEV" pull "$APK" "$USB_DST" 2>&1 | tee -a "$LOGFILE" ; then
+if maybe_timeout "pull" "$ADB_BIN" -s "$DEV" pull "$APK" "$USB_DST" 2>&1 \
+  | tee -a "$LOGFILE" ; then
   PULL_RC=0
   log "pull rc=0"
 else

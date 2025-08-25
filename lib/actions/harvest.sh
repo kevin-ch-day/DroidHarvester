@@ -119,4 +119,5 @@ harvest() {
     finalize_report "all"
     LAST_TXT_REPORT="$TXT_REPORT"
     log SUCCESS "Harvest complete. Reports written to $RESULTS_DIR"
+    logging_rotate
 }

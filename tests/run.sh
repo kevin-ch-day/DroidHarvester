@@ -21,6 +21,9 @@ if rg -n 'pull.+\| tee' -g '!tests/run.sh' -g '!scripts/archive/*' > /tmp/tee.tx
   exit 1
 fi
 
+"$ROOT/tests/guards/no_legacy_log_paths.sh"
+"$ROOT/tests/integration/log_write_selftest.sh"
+
 # Load helpers
 # shellcheck disable=SC1090
 . "$ROOT/lib/core/logging.sh"

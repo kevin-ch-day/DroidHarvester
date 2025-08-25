@@ -2,7 +2,7 @@
 # Minimal APK diagnostics using centralized helpers (Fedora/Linux)
 # - Collects pm path (raw + sanitized)
 # - Optionally pulls up to N APKs (base first), compares sizes, verifies hashes
-# - Writes summary to root logs/ and artifacts to results/<DEVICE>/
+# - Writes summary to root log/ and artifacts to results/<DEVICE>/
 set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO: $BASH_COMMAND" >&2' ERR
@@ -18,13 +18,12 @@ Examples:
 
 Notes:
 - Writes artifacts to results/<DEVICE>/manual_diag_<ts>/
-- Writes a summary to logs/adb_apk_diag_<ts>_<pkg>.txt
+  - Writes a summary to log/adb_apk_diag_<ts>_<pkg>.txt
 EOF
 }
 
 # ---- Bootstrap ---------------------------------------------------------------
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_DIR="$ROOT/logs"; mkdir -p "$LOG_DIR"
 
 # Load configs if present (idempotent)
 if [[ -d "$ROOT/config" ]]; then
@@ -33,6 +32,7 @@ if [[ -d "$ROOT/config" ]]; then
     [[ -r "$f" ]] && source "$f"
   done
 fi
+mkdir -p "$LOG_DIR"
 
 # Shared libs (ordered: logging/errors → trace → device → pm/apk utils)
 # shellcheck disable=SC1090
@@ -192,7 +192,7 @@ have_func au_scan_tiktok_family  && au_scan_tiktok_family  >"$OUT_FAM" || true
 have_func au_scan_tiktok_related && au_scan_tiktok_related >"$OUT_REL" || true
 
 # ---- Summary log -------------------------------------------------------------
-SUMMARY="$LOG_DIR/adb_apk_diag_${TS}_${PKG_ESC}.txt"
+SUMMARY="$(_log_path "adb_apk_diag_${PKG_ESC}")"
 log_file_init "$SUMMARY"
 {
   echo "package=$PKG"

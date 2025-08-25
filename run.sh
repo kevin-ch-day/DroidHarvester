@@ -9,16 +9,6 @@ set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
-# Optional: allow log cleanup via flag or env var
-# Use numeric 1/0 so arithmetic comparisons work in sourced libs.
-CLEAN_LOGS=${CLEAN_LOGS:-0}
-for arg in "$@"; do
-    case "$arg" in
-        --clear-logs) CLEAN_LOGS=1 ;;
-        *) echo "Usage: $0 [--clear-logs]" >&2; exit 64 ;;
-    esac
-done
-
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
@@ -45,12 +35,8 @@ if declare -F validate_config >/dev/null 2>&1; then
     validate_config
 fi
 
-# Optionally clear logs when exiting
-if (( CLEAN_LOGS == 1 )); then
-    cleanup_logs_on_exit() {
-        find "$LOG_DIR" "$REPO_ROOT/config/logs" "$REPO_ROOT/scripts/logs" -type f -name '*.txt' -delete 2>/dev/null || true
-    }
-    trap cleanup_logs_on_exit EXIT
+if [[ "${CLEAR_LOGS:-false}" == "true" ]]; then
+    find "$LOG_ROOT" -type f -name '*.txt' -delete 2>/dev/null || true
 fi
 
 # Core + IO + menu libs
@@ -69,6 +55,7 @@ done
 
 init_session
 log_file_init "$LOGFILE"
+logging_rotate
 
 check_dependencies
 
@@ -93,7 +80,7 @@ fi
 session_metadata
 
 if [[ $DH_DEBUG -eq 1 ]]; then
-    enable_xtrace_to_file "$LOGS_DIR/trace_$TIMESTAMP.log"
+    enable_xtrace_to_file "$(_log_path trace)"
 fi
 
 while true; do
@@ -119,7 +106,7 @@ while true; do
         "Export report bundle" \
         "Resume last session" \
         "Clean up partial run" \
-        "Clear logs/results" \
+        "Clear log/results" \
         "Exit"
     choice=$(read_choice 13)
 
