@@ -28,7 +28,7 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/log"
+LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 TS="$(date +%Y%m%d_%H%M%S)"
 TRANSCRIPT="$LOG_DIR/wrappers_diag_${TS}.txt"
@@ -65,7 +65,7 @@ print_set "Before sourcing libs" || true
 source "$REPO_ROOT/config/config.sh" || true
 
 # shellcheck disable=SC1090
-source "$REPO_ROOT/lib/core/logging.sh"  || true
+source "$REPO_ROOT/lib/logging/logging_engine.sh"  || true
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/errors.sh"   || true
 # shellcheck disable=SC1090

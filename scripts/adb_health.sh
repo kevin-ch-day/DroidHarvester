@@ -9,7 +9,7 @@ source "$ROOT/config/config.sh"
 
 # Shared helpers
 # shellcheck disable=SC1090
-source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/logging/logging_engine.sh"
 # shellcheck disable=SC1090
 source "$ROOT/lib/core/errors.sh"
 # shellcheck disable=SC1090

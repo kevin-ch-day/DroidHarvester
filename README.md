@@ -22,12 +22,12 @@ Typical workflow:
 2. Choose **Scan for target apps** to detect installed packages.
 3. Choose **Harvest** to pull APK splits and metadata for discovered apps.
 
-Artifacts and logs are written under `results/<serial>/` and `log/` by default.
+Artifacts and logs are written under `results/<serial>/` and `logs/` by default.
 
 Standalone diagnostic scripts live at `scripts/adb_apk_diag.sh` and
 `scripts/adb_health.sh`, both of which reuse the core helpers.
 
-Use `scripts/cleanup_outputs.sh` or the "Clear log/results" menu option to
+Use `scripts/cleanup_outputs.sh` or the "Clear logs/results" menu option to
 remove all previous artifacts and start fresh.
 
 ## Diagnostics
@@ -52,7 +52,7 @@ To write scripts that interact with a device:
 ```bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/config/config.sh"
-source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/logging/logging_engine.sh"
 source "$ROOT/lib/core/device/env.sh"
 source "$ROOT/lib/core/device/select.sh"
 source "$ROOT/lib/core/device/wrappers.sh"
@@ -133,13 +133,13 @@ tests/run.sh
 
 ## Repo Conventions
 
-- All logs are stored under `./log/`.
+- All logs are stored under `./logs/`.
 - `scripts/` contains ad-hoc utilities; production code in `lib/` and `run.sh`
   must not source from it.
 - `tests/` holds canonical tests and guards.
 
 ### Environment variables
 
-- `LOG_ROOT` / `LOG_DIR` – base directory for logs (defaults to `./log`).
+- `LOG_DIR` – base directory for logs (defaults to `./logs`; `LOG_ROOT` is a deprecated alias).
 - `LOG_KEEP_N` – if set to an integer, retain only that many recent log files.
 - `CLEAR_LOGS` – set to `true` to delete existing logs at startup.

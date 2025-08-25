@@ -9,7 +9,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/log"
+LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/wrappers_selftest_$(date +%Y%m%d_%H%M%S).txt"
 
@@ -17,7 +17,7 @@ LOG_LEVEL=DEBUG
 export LOG_LEVEL
 
 # shellcheck disable=SC1090
-for m in core/logging core/errors core/trace core/device; do
+for m in logging/logging_engine core/errors core/trace core/device; do
   source "$REPO_ROOT/lib/$m.sh"
 done
 log_file_init "$LOG_FILE.log"

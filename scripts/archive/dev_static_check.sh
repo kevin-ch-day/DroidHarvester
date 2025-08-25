@@ -12,7 +12,7 @@ REPO_ROOT="$(cd "
 $(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/log"
+LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/static_check_$(date +%Y%m%d_%H%M%S).txt"
 

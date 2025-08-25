@@ -16,7 +16,7 @@ DH_PULL_TIMEOUT="${DH_PULL_TIMEOUT:-}"   # seconds; if set and non-zero we use `
 OUTDIR="${OUTDIR:-/tmp/dh_pull_test}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1090
-source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/logging/logging_engine.sh"
 mkdir -p "$OUTDIR"
 
 LOGFILE="${LOGFILE:-$(_log_path pull_stream_${PKG//./_})}"

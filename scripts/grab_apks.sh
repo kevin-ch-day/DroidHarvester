@@ -16,28 +16,28 @@ else
   exit 64
 fi
 
-# Transcript to /log
 TS="$(date +%Y%m%d_%H%M%S)"
-LOGFILE="${LOG_ROOT}/apk_grab_${TS}.txt"
-exec > >(tee -a "$LOGFILE") 2>&1
-echo "[INFO] transcript: $LOGFILE"
+
+# shellcheck disable=SC1090
+source "$REPO_ROOT/lib/logging/logging_engine.sh"
+log_file_init "$(_log_path apk_grab)"
 
 # adb + device
 ADB_BIN="${ADB_BIN:-$(command -v adb || true)}"
-[[ -x "${ADB_BIN:-}" ]] || { echo "[FATAL] adb not found"; exit 2; }
+[[ -x "${ADB_BIN:-}" ]] || { log ERROR "adb not found"; exit 2; }
 SERIAL="$("$ADB_BIN" get-serialno 2>/dev/null || true)"
-[[ -n "$SERIAL" && "$SERIAL" != "unknown" ]] || { echo "[FATAL] no device"; exit 3; }
+[[ -n "$SERIAL" && "$SERIAL" != "unknown" ]] || { log ERROR "no device"; exit 3; }
 ADB_S=(-s "$SERIAL")
 
 OUT_ROOT="${RESULTS_DIR}/${SERIAL}/quick_pull_${TS}"
 mkdir -p "$OUT_ROOT"
 
 # Targets from config (plus any customs that config appended)
-(( ${#TARGET_PACKAGES[@]} )) || { echo "[WARN] no targets defined"; exit 0; }
+(( ${#TARGET_PACKAGES[@]} )) || { log WARN "no targets defined"; exit 0; }
 
-echo "[INFO] device : $SERIAL"
-echo "[INFO] output : $OUT_ROOT"
-echo "[INFO] targets: ${TARGET_PACKAGES[*]}"
+log INFO "device : $SERIAL"
+log INFO "output : $OUT_ROOT"
+log INFO "targets: ${TARGET_PACKAGES[*]}"
 
 sanitize_paths() { tr -d '\r' | sed -n 's/^package://p'; }
 order_base_first() {
@@ -82,14 +82,14 @@ pull_one_pkg() {
   local pulled="$pkg_root/pulled"
   mkdir -p "$pm_dir" "$meta_dir" "$pulled"
 
-  echo "[INFO] $pkg: discovering APKs..."
+  log INFO "$pkg: discovering APKs..."
   local raw; raw="$(get_pm_paths "$pkg")"
   printf "%s\n" "$raw"                        > "$pm_dir/raw.txt"
   printf "%s\n" "$raw" | sanitize_paths       > "$pm_dir/san.txt"
 
   local paths; paths="$(printf "%s\n" "$raw" | sanitize_paths | order_base_first)"
   if [[ -z "$paths" ]]; then
-    echo "[WARN] $pkg: no paths (not installed?)"
+    log WARN "$pkg: no paths (not installed?)"
     return 0
   fi
 
@@ -110,7 +110,7 @@ pull_one_pkg() {
     local fn; fn="$(basename "$rp")"
     local dest="$pulled/$fn"
 
-    echo "[INFO] $pkg: pulling $fn ($rb bytes)..."
+    log INFO "$pkg: pulling $fn ($rb bytes)..."
     if safe_pull_file "$rp" "$dest"; then
       local lb; lb="$(stat -c %s "$dest" 2>/dev/null || wc -c < "$dest" 2>/dev/null || echo 0)"
       local sh; sh="$(sha256_host "$dest" 2>/dev/null || echo NA)"
@@ -118,7 +118,7 @@ pull_one_pkg() {
       printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$kind" "$rp" "$rb" "$lb" "$sh" "$status" >> "$csv"
     else
       printf "%s,%s,%s,%s,%s,%s,%s\n" "$pkg" "$kind" "$rp" "$rb" "0" "NA" "PULL_FAIL" >> "$csv"
-      echo "[WARN] $pkg: pull failed for $fn"
+      log WARN "$pkg: pull failed for $fn"
       rm -f "$dest" || true
     fi
   done <<< "$paths"
@@ -129,11 +129,11 @@ pull_one_pkg() {
     ) || true
   fi
 
-  echo "[OK]  $pkg → $pkg_root"
+  log SUCCESS "$pkg → $pkg_root"
 }
 
 for pkg in "${TARGET_PACKAGES[@]}"; do
   pull_one_pkg "$pkg"
 done
 
-echo "[DONE] Artifacts under: $OUT_ROOT"
+log SUCCESS "Artifacts under: $OUT_ROOT"

@@ -27,7 +27,7 @@ fi
 
 # Load helpers
 # shellcheck disable=SC1090
-. "$ROOT/lib/core/logging.sh"
+. "$ROOT/lib/logging/logging_engine.sh"
 export LOGFILE=/dev/null
 # shellcheck disable=SC1090
 . "$ROOT/lib/core/trace.sh"
@@ -110,7 +110,7 @@ tmp=$(mktemp)
 FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   source "$ROOT/lib/core/errors.sh"
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -130,7 +130,7 @@ tmp_fail=$(mktemp)
 if FAKE_ADB_SCENARIO=list_fail ROOT="$ROOT" bash -c '
   set -euo pipefail
   source "$ROOT/lib/core/errors.sh"
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -153,7 +153,7 @@ tmp_fail_dbg=$(mktemp)
 if FAKE_ADB_SCENARIO=list_fail DH_DEBUG=1 ROOT="$ROOT" bash -c '
   set -euo pipefail
   source "$ROOT/lib/core/errors.sh"
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -171,7 +171,7 @@ grep -q '\[CMD\]' "$tmp_fail_dbg"
 rm -rf /tmp/pull_good
 FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -185,7 +185,7 @@ FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
 rm -rf /tmp/pull_perm
 FAKE_ADB_SCENARIO=pull_perm ROOT="$ROOT" bash -c '
   set -euo pipefail
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -199,7 +199,7 @@ FAKE_ADB_SCENARIO=pull_perm ROOT="$ROOT" bash -c '
 rm -rf /tmp/pull_fail
 if FAKE_ADB_SCENARIO=pull_fail ROOT="$ROOT" bash -c '
   set -euo pipefail
-  source "$ROOT/lib/core/logging.sh"
+  source "$ROOT/lib/logging/logging_engine.sh"
   LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
@@ -216,7 +216,7 @@ grep -q 'direct pull failed' /tmp/pull_fail.log
 out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -230,7 +230,7 @@ printf '%s\n' "$out" | grep -q '/data/app/com.zhiliaoapp.musically-1/split_confi
 out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -243,7 +243,7 @@ printf '%s\n' "$out" | grep -q '/data/app/.*base.apk'
 verify=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -257,7 +257,7 @@ printf '%s\n' "$verify" | grep -q $'/data/app/doesnotexist.apk\tMISSING'
 out=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -271,7 +271,7 @@ printf '%s\n' "$out" | grep -q '^com.example.app$'
 hash=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -284,7 +284,7 @@ hash=$(FAKE_ADB_SCENARIO=good ROOT="$ROOT" bash -c '
 hash=$(FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -299,7 +299,7 @@ rm -rf /tmp/pull_nosha
 FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -312,7 +312,7 @@ FAKE_ADB_SCENARIO=nosha ROOT="$ROOT" bash -c '
 if FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -329,7 +329,7 @@ rm -rf /tmp/direct_ok
 FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -345,7 +345,7 @@ rm -rf /tmp/run_as_ok
 FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -360,7 +360,7 @@ FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
 out=$(FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -372,7 +372,7 @@ out=$(FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
 out=$(FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -384,7 +384,7 @@ out=$(FAKE_ADB_SCENARIO=cap_run_as ROOT="$ROOT" bash -c '
 if FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -399,7 +399,7 @@ fi
 out=$(FAKE_ADB_SCENARIO=cap_retail ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
@@ -417,7 +417,7 @@ printf '%s\n' "$out" | grep -q 'com.whatsapp: none'
 out=$(FAKE_ADB_SCENARIO=cap_direct ROOT="$ROOT" bash -c '
   set -euo pipefail
   PATH="$ROOT/tests/fakes:$PATH"
-  source "$ROOT/lib/core/logging.sh"; LOGFILE=/dev/null
+  source "$ROOT/lib/logging/logging_engine.sh"; LOGFILE=/dev/null
   source "$ROOT/lib/core/trace.sh"
   source "$ROOT/lib/core/device.sh"
   source "$ROOT/lib/io/apk_utils.sh"
