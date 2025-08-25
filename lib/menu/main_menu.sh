@@ -40,5 +40,5 @@ render_main_menu() {
         "Export report bundle" \
         "Resume last session" \
         "Clean up partial run" \
-        "Clear logs/results"
+        "Clear logs and results"
 }

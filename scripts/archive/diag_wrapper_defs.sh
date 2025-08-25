@@ -28,10 +28,11 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/logs"
-mkdir -p "$LOG_DIR"
+: "${LOG_ROOT:="$REPO_ROOT/logs"}"
+LOG_DIR="$LOG_ROOT"  # Backwards compatibility
+mkdir -p "$LOG_ROOT"
 TS="$(date +%Y%m%d_%H%M%S)"
-TRANSCRIPT="$LOG_DIR/wrappers_diag_${TS}.txt"
+TRANSCRIPT="$LOG_ROOT/wrappers_diag_${TS}.txt"
 
 echo "Transcript: $TRANSCRIPT"
 echo "Repo root : $REPO_ROOT"

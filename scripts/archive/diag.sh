@@ -41,7 +41,9 @@ export LOG_LEVEL
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
-LOG_DIR="$REPO_ROOT/logs"; mkdir -p "$LOG_DIR"
+: "${LOG_ROOT:="$REPO_ROOT/logs"}"
+LOG_DIR="$LOG_ROOT"  # Backwards compatibility
+mkdir -p "$LOG_ROOT"
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config/config.sh"
@@ -54,7 +56,7 @@ validate_config
 DEVICE="$(device_pick_or_fail "$DEVICE")"
 
 cmd_health() {
-  local log="$LOG_DIR/adb_health_$(date +%Y%m%d_%H%M%S).txt"
+  local log="$LOG_ROOT/adb_health_$(date +%Y%m%d_%H%M%S).txt"
   log_file_init "$log"
   run_step() {
     local title="$1"; shift
@@ -76,9 +78,9 @@ cmd_paths() {
   local ts
   ts=$(date +%Y%m%d_%H%M%S)
   local base="paths_diag_${ts}_$(echo "$PKG" | tr '.' '_')"
-  local out="$LOG_DIR/${base}.out"
-  local err="$LOG_DIR/${base}.err"
-  local sum="$LOG_DIR/${base}.summary.txt"
+  local out="$LOG_ROOT/${base}.out"
+  local err="$LOG_ROOT/${base}.err"
+  local sum="$LOG_ROOT/${base}.summary.txt"
   set +e
   DEVICE="$DEVICE" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/generate_apk_list.sh" "$PKG" >"$out" 2>"$err"
   local rc=$?
@@ -118,9 +120,9 @@ cmd_pull() {
   local ts
   ts=$(date +%Y%m%d_%H%M%S)
   local base="pull_diag_${ts}_$(echo "$PKG" | tr '.' '_')"
-  local out="$LOG_DIR/${base}.out"
-  local err="$LOG_DIR/${base}.err"
-  local sum="$LOG_DIR/${base}.summary.txt"
+  local out="$LOG_ROOT/${base}.out"
+  local err="$LOG_ROOT/${base}.err"
+  local sum="$LOG_ROOT/${base}.summary.txt"
   set +e
   DEVICE="$DEVICE" LOGFILE="$LOGFILE" bash "$REPO_ROOT/steps/generate_apk_list.sh" "$PKG" >"$out" 2>"$err"
   set -e
@@ -149,7 +151,7 @@ cmd_pull() {
 cmd_peek() {
   local pkg_esc="${PKG//./_}"
   local sum
-  sum=$(ls -1t "$LOG_DIR"/pull_diag_*_${pkg_esc}.summary.txt 2>/dev/null | head -n1 || true)
+  sum=$(ls -1t "$LOG_ROOT"/pull_diag_*_${pkg_esc}.summary.txt 2>/dev/null | head -n1 || true)
   if [[ -z "$sum" ]]; then
     echo "No pull diag found for $PKG"; return 0
   fi

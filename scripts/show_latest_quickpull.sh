@@ -3,7 +3,7 @@
 # scripts/show_latest_quickpull.sh
 # List APKs (with sizes) from the most recent quick pull,
 # plus a consolidated status and per-package summary.
-# Logs are sourced from ./logs/.
+# Logs are sourced from $LOG_ROOT.
 # ---------------------------------------------------
 set -euo pipefail
 
@@ -15,9 +15,9 @@ try_source() { [[ -r "$1" ]] && source "$1" >/dev/null 2>&1 || true; } # shellch
 try_source "$REPO_ROOT/config/config.sh"
 try_source "$REPO_ROOT/config/paths.sh"
 
-# --- Locate latest quick pull log under configured LOG_DIR ---
+# --- Locate latest quick pull log under configured LOG_ROOT ---
 pick_newest_log() {
-  local d="${LOG_DIR:-$REPO_ROOT/logs}"
+  local d="${LOG_ROOT:-$REPO_ROOT/logs}"
   [[ -d "$d" ]] || return 1
   compgen -G "$d/apk_grab_*.txt" >/dev/null || return 1
   ls -1t "$d"/apk_grab_*.txt | head -1
