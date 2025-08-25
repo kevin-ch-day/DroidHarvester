@@ -14,8 +14,10 @@ resume_last_session() {
         return
     fi
     last_dev="${last_dev%/}"
-    DEVICE=$(basename "$last_dev")
     DEVICE_DIR="$last_dev"
+    DEVICE_SERIAL="$(basename "$last_dev" | awk -F'_' '{print $NF}')"
+    DEVICE="$DEVICE_SERIAL"
+    gather_device_profile "$DEVICE_SERIAL"
     init_report
-    log SUCCESS "Resumed device: $DEVICE"
+    log SUCCESS "Resumed device: $DEVICE_LABEL"
 }

@@ -82,9 +82,10 @@ if [[ -f "$outfile" ]]; then
     [[ "$uid" != "unknown" ]] && log INFO "      UID         : $uid"
     log INFO "      InstallType : $installType"
 
-    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
         "$(csv_escape "$pkg")" \
         "$(csv_escape "$outfile")" \
+        "$(csv_escape "$role")" \
         "$(csv_escape "$sha256")" \
         "$(csv_escape "$sha1")" \
         "$(csv_escape "$md5")" \
@@ -101,11 +102,12 @@ if [[ -f "$outfile" ]]; then
         "$(csv_escape "$installType")" \
         "$(csv_escape "TBD")" >> "$REPORT"
 
-    append_txt_report "$pkg" "$outfile" "$sha256" "$sha1" "$md5" "$size" "$version" "$versionCode" "$targetSdk" "$installer" "$installType"
+    append_txt_report "$pkg" "$outfile" "$role" "$sha256" "$sha1" "$md5" "$size" "$version" "$versionCode" "$targetSdk" "$installer" "$installType"
 
     jq -n \
       --arg pkg "$pkg" \
       --arg file "$outfile" \
+      --arg role "$role" \
       --arg sha256 "$sha256" \
       --arg sha1 "$sha1" \
       --arg md5 "$md5" \
@@ -121,7 +123,7 @@ if [[ -f "$outfile" ]]; then
       --arg uid "$uid" \
       --arg installType "$installType" \
       --arg findings "TBD" \
-      '{package:$pkg,file:$file,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType,findings:$findings}' \
+      '{package:$pkg,file:$file,role:$role,sha256:$sha256,sha1:$sha1,md5:$md5,size:$size,perms:$perms,modified:$mtime,version:$version,versionCode:$versionCode,targetSdk:$targetSdk,installer:$installer,firstInstall:$firstInstall,lastUpdate:$lastUpdate,uid:$uid,installType:$installType,findings:$findings}' \
       >> "$JSON_REPORT.tmp"
 
     pulled_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"

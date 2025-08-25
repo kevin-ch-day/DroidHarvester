@@ -15,11 +15,13 @@ cleanup_partial_run() {
     case "$ans" in
         [Yy]*)
             rm -rf "$DEVICE_DIR"
-            local script_res="$REPO_ROOT/scripts/results/$DEVICE"
+            local script_res="$REPO_ROOT/scripts/results/$DEVICE_DIR_NAME"
             rm -rf "$script_res" 2>/dev/null || true
             log SUCCESS "Removed $DEVICE_DIR"
             [[ -d "$script_res" ]] || log SUCCESS "Removed $script_res"
             DEVICE=""
+            DEVICE_LABEL=""
+            DEVICE_SERIAL=""
             ;;
         *)     log WARN "Cleanup cancelled." ;;
     esac

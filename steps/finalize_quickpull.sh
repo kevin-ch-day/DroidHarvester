@@ -35,8 +35,19 @@ pick_latest_quickpull() {
 SRC_ROOT="$(pick_latest_quickpull || true)"
 [[ -n "${SRC_ROOT:-}" && -d "$SRC_ROOT" ]] || { echo "[FATAL] No quick pull folder found."; exit 1; }
 
-SERIAL="$(basename "$(dirname "$SRC_ROOT")")"
-DST_ROOT="$RESULTS_DIR/$SERIAL/quick_pull_results"
+DEVICE_ROOT="$(dirname "$SRC_ROOT")"
+PROFILE_FILE="$DEVICE_ROOT/device_profile.txt"
+DEVICE_VENDOR=""
+DEVICE_MODEL=""
+DEVICE_SERIAL=""
+if [[ -f "$PROFILE_FILE" ]]; then
+  DEVICE_VENDOR="$(grep -m1 '^vendor=' "$PROFILE_FILE" | cut -d= -f2-)"
+  DEVICE_MODEL="$(grep -m1 '^model=' "$PROFILE_FILE" | cut -d= -f2-)"
+  DEVICE_SERIAL="$(grep -m1 '^serial=' "$PROFILE_FILE" | cut -d= -f2-)"
+else
+  DEVICE_SERIAL="$(basename "$DEVICE_ROOT" | awk -F'_' '{print $NF}')"
+fi
+DST_ROOT="$DEVICE_ROOT/quick_pull_results"
 mkdir -p "$DST_ROOT"
 
 echo "[INFO] Source : $SRC_ROOT"
@@ -105,7 +116,7 @@ sha256_host() {
 
 MAN_CSV="$DST_ROOT/manifest.csv"
 if [[ ! -s "$MAN_CSV" ]]; then
-  echo "app_dir,app_file,package,versionName,versionCode,kind,bytes,sha256,src,dst" > "$MAN_CSV"
+  echo "app_dir,app_file,package,versionName,versionCode,apk_role,bytes,sha256,src,dst,device_vendor,device_model,device_serial" > "$MAN_CSV"
 fi
 
 shopt -s nullglob
@@ -133,11 +144,11 @@ for pkg_dir in "$SRC_ROOT"/*; do
   for src_apk in "$pulled"/*.apk; do
     [[ -f "$src_apk" ]] || continue
     bn="$(basename "$src_apk")"
-    kind="split"
+    apk_role="split"
     out_name="$file_base"
 
     if [[ "$bn" == "base.apk" ]]; then
-      kind="base"
+      apk_role="base"
       [[ -n "$vname" || -n "$vcode" ]] && out_name="${out_name}_v${vname:-NA}_${vcode:-NA}"
       out_file="${out_name}.apk"
     elif [[ "$bn" == split_*.apk ]]; then
@@ -154,7 +165,7 @@ for pkg_dir in "$SRC_ROOT"/*; do
 
     bytes="$(stat -c %s "$dst" 2>/dev/null || wc -c < "$dst")"
     hash="$(sha256_host "$dst")"
-    echo "$app_dir,$out_file,$pkg,${vname:-},${vcode:-},$kind,$bytes,$hash,$src_apk,$dst" >> "$MAN_CSV"
+    echo "$app_dir,$out_file,$pkg,${vname:-},${vcode:-},$apk_role,$bytes,$hash,$src_apk,$dst,$DEVICE_VENDOR,$DEVICE_MODEL,$DEVICE_SERIAL" >> "$MAN_CSV"
 
     echo "[COPY] $pkg: $bn -> $app_dir/$out_file"
   done
