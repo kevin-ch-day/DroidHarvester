@@ -26,6 +26,8 @@ fi
 "$ROOT/tests/integration/log_write_selftest.sh"
 "$ROOT/tests/integration/finalize_quickpull_test.sh"
 "$ROOT/tests/integration/migrate_logs_collision_test.sh"
+"$ROOT/tests/unit/twitter_no_slash_test.sh"
+
 
 # Load helpers
 # shellcheck disable=SC1090
