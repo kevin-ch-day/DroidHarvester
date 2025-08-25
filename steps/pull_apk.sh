@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/config/config.sh"
 
 # core libs
-for m in core/logging core/errors core/trace core/device io/apk_utils io/report; do
+for m in logging/logging_engine core/errors core/trace core/device io/apk_utils io/report; do
   # shellcheck source=/dev/null
   source "$REPO_ROOT/lib/$m.sh"
 done

@@ -6,7 +6,7 @@
 #        Consumers: diag.sh, steps/*, higher-level actions.
 #
 # Requires (provided elsewhere in repo):
-#   - log (core/logging), with_trace/with_timeout (core/trace), adb_retry (core/device)
+#   - log (logging/logging_engine), with_trace/with_timeout (core/trace), adb_retry (core/device)
 #   - env: DEVICE (selected device id), DEVICE_DIR (optional staging dir per device)
 #
 # Conventions:

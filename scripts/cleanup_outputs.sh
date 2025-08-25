@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1090
 source "$ROOT/config/config.sh"
 # shellcheck disable=SC1090
-source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/logging/logging_engine.sh"
 # shellcheck disable=SC1090
 source "$ROOT/lib/actions/cleanup.sh"
 

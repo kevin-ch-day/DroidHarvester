@@ -2,7 +2,7 @@
 # Minimal APK diagnostics using centralized helpers (Fedora/Linux)
 # - Collects pm path (raw + sanitized)
 # - Optionally pulls up to N APKs (base first), compares sizes, verifies hashes
-# - Writes summary to root log/ and artifacts to results/<DEVICE>/
+# - Writes summary to root logs/ and artifacts to results/<DEVICE>/
 set -euo pipefail
 set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]:-?}:$LINENO: $BASH_COMMAND" >&2' ERR
@@ -18,7 +18,7 @@ Examples:
 
 Notes:
 - Writes artifacts to results/<DEVICE>/manual_diag_<ts>/
-  - Writes a summary to log/adb_apk_diag_<ts>_<pkg>.txt
+  - Writes a summary to logs/adb_apk_diag_<ts>_<pkg>.txt
 EOF
 }
 
@@ -31,7 +31,7 @@ source "$ROOT/config/config.sh"
 
 # Shared libs (ordered: logging/errors → trace → device → pm/apk utils)
 # shellcheck disable=SC1090
-source "$ROOT/lib/core/logging.sh"
+source "$ROOT/lib/logging/logging_engine.sh"
 # shellcheck disable=SC1090
 source "$ROOT/lib/core/errors.sh"
 # shellcheck disable=SC1090

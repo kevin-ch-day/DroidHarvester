@@ -19,7 +19,7 @@ source "$REPO_ROOT/config/config.sh"
 
 # --- Core logging/errors ---
 # shellcheck disable=SC1090
-source "$REPO_ROOT/lib/core/logging.sh"
+source "$REPO_ROOT/lib/logging/logging_engine.sh"
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/errors.sh"
 
@@ -101,7 +101,7 @@ print_menu() {
    [10] Export report bundle
    [11] Resume last session
    [12] Clean up partial run
-   [13] Clear log/results
+   [13] Clear logs/results
    [ 0] Exit
 MENU
 }

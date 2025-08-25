@@ -7,12 +7,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 SCRIPT_DIR="$REPO_ROOT"
 
-LOG_DIR="$REPO_ROOT/log"
+LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/config/config.sh"
-for m in core/logging core/errors; do
+for m in logging/logging_engine core/errors; do
   # shellcheck disable=SC1090
   source "$REPO_ROOT/lib/$m.sh"
 done
