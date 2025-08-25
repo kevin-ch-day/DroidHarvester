@@ -16,9 +16,9 @@ draw_menu_header() {
     local line
     line=$(ui_line "$UI_H2")
     echo
-    echo "${CYAN}${line}${NC}"
+    echo "${WHITE}${line}${NC}"
     printf " ${WHITE}%s${NC}\n" "DROIDHARVESTER // ANALYST CONTROL INTERFACE"
-    echo "${CYAN}${line}${NC}"
+    echo "${WHITE}${line}${NC}"
     printf " ${CYAN}SESSION${NC} : ${WHITE}%s${NC}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
     printf " ${CYAN}MODULE ${NC} : ${WHITE}%s${NC}\n" "$title"
     if [[ -n "$device_arg" ]]; then
@@ -27,14 +27,14 @@ draw_menu_header() {
     if [[ -n "$report_arg" ]]; then
         printf " ${CYAN}REPORT ${NC} : ${WHITE}%s${NC}\n" "${report_arg:-None}"
     fi
-    echo "${CYAN}${line}${NC}"
+    echo "${WHITE}${line}${NC}"
 }
 
 draw_menu_footer() {
     local status="${1:-Awaiting analyst command...}"
     local line
     line=$(ui_line "$UI_H1")
-    echo "${CYAN}${line}${NC}"
+    echo "${WHITE}${line}${NC}"
     printf " ${CYAN}STATUS${NC} : ${WHITE}%s${NC}\n" "$status"
-    echo "${CYAN}$(ui_line "$UI_H2")${NC}"
+    echo "${WHITE}$(ui_line "$UI_H2")${NC}"
 }

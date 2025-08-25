@@ -11,7 +11,12 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/core/trace.sh"
 # shellcheck disable=SC1090
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/core/device.sh"
 
-to_safe() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_'; }
+to_safe() {
+    local s
+    s=$(echo "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '_')
+    s=$(echo "$s" | tr -s '_' | sed 's/^_//; s/_$//')
+    echo "$s"
+}
 
 gather_device_profile() {
     local serial="$1"

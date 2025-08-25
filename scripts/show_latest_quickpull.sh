@@ -3,7 +3,7 @@
 # scripts/show_latest_quickpull.sh
 # List APKs (with sizes) from the most recent quick pull,
 # plus a consolidated status and per-package summary.
-# Works whether logs live in ./log or ./logs.
+# Logs are sourced from ./logs/.
 # ---------------------------------------------------
 set -euo pipefail
 
