@@ -44,7 +44,7 @@ cd "$REPO_ROOT"
 LOG_DIR="$REPO_ROOT/log"; mkdir -p "$LOG_DIR"
 
 # shellcheck disable=SC1090
-source "$REPO_ROOT/config.sh"
+source "$REPO_ROOT/config/config.sh"
 # shellcheck disable=SC1090
 for m in core/logging core/errors core/deps core/device core/trace io/report; do
   source "$REPO_ROOT/lib/$m.sh"

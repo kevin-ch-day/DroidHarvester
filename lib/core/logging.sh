@@ -15,11 +15,19 @@ NC="\033[0m"
 
 : "${LOG_LEVEL:=INFO}"
 : "${REPO_ROOT:="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"}"
-: "${SCRIPT_DIR:="$REPO_ROOT"}"
-: "${LOG_DIR:="$REPO_ROOT/log"}"
-LOG_ROOT="${LOG_ROOT:-$LOG_DIR}"
-LOGS_DIR="$LOG_DIR"
-mkdir -p "$LOG_DIR"
+: "${LOG_ROOT:="$REPO_ROOT/log"}"
+: "${LOG_DIR:="${LOG_ROOT}"}"
+
+logging_init() {
+    mkdir -p "$LOG_DIR"
+    if [[ "${CLEAR_LOGS:-false}" == true ]]; then
+        rm -f "$LOG_DIR"/*.txt 2>/dev/null || true
+    fi
+    logging_rotate
+    if [[ -z "${LOGFILE:-}" ]]; then
+        LOGFILE="$(_log_path harvest_log)"
+    fi
+}
 
 _log_path() {
     local prefix="$1"
@@ -46,8 +54,9 @@ logging_rotate() {
     done
 }
 
-if [[ -z "${LOGFILE:-}" ]]; then
-    LOGFILE="$(_log_path harvest_log)"
+if [[ -z "${DROIDHARVESTER_LOGGING_INITIALIZED:-}" ]]; then
+    logging_init
+    DROIDHARVESTER_LOGGING_INITIALIZED=1
 fi
 
 # Initialize logging to a specific file

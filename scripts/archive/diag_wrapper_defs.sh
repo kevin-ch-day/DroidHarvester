@@ -62,7 +62,7 @@ print_set "Before sourcing libs" || true
 
 # B) Source config and likely providers of these wrappers
 # shellcheck disable=SC1090
-source "$REPO_ROOT/config.sh" || true
+source "$REPO_ROOT/config/config.sh" || true
 
 # shellcheck disable=SC1090
 source "$REPO_ROOT/lib/core/logging.sh"  || true

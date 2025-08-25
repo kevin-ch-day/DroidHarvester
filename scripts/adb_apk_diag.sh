@@ -25,14 +25,9 @@ EOF
 # ---- Bootstrap ---------------------------------------------------------------
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Load configs if present (idempotent)
-if [[ -d "$ROOT/config" ]]; then
-  for f in "$ROOT"/config/*.sh; do
-    # shellcheck disable=SC1090
-    [[ -r "$f" ]] && source "$f"
-  done
-fi
-mkdir -p "$LOG_DIR"
+# Load config first so helpers honor overrides
+# shellcheck disable=SC1090
+source "$ROOT/config/config.sh"
 
 # Shared libs (ordered: logging/errors → trace → device → pm/apk utils)
 # shellcheck disable=SC1090
@@ -51,6 +46,8 @@ source "$ROOT/lib/core/device/wrappers.sh"
 source "$ROOT/lib/core/device/pm.sh"
 # shellcheck disable=SC1090
 source "$ROOT/lib/io/apk_utils.sh"
+
+log_file_init "$(_log_path adb_apk_diag)"
 
 # ---- CLI ---------------------------------------------------------------------
 PULL=0

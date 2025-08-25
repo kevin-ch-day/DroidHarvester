@@ -3,3 +3,4 @@ results/
 *.apk
 *.zip
 *.tmp
+/config/local.sh
