@@ -7,6 +7,7 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 # ---------------------------------------------------
 
 init_session() {
+    CLEAN_LOGS=${CLEAN_LOGS:-0}
     TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
     RESULTS_DIR="$SCRIPT_DIR/results"
     LOGS_DIR="$SCRIPT_DIR/logs"

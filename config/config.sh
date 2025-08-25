@@ -38,8 +38,8 @@ fi
 # Ensure base dirs exist (harmless if already present)
 mkdir -p "${RESULTS_DIR}" "${LOG_DIR}"
 
-# Automatically purge logs after run.sh exits (true/false)
-: "${CLEAR_LOGS:=false}"
+# Automatically purge logs after run.sh exits (1 to enable)
+: "${CLEAN_LOGS:=0}"
 
 # ===============================
 # II. TARGET PACKAGES

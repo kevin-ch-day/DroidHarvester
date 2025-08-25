@@ -10,10 +10,11 @@ set -E
 trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO: $BASH_COMMAND" >&2' ERR
 
 # Optional: allow log cleanup via flag or env var
-CLEAR_LOGS="${CLEAR_LOGS:-false}"
+# Use numeric 1/0 so arithmetic comparisons work in sourced libs.
+CLEAN_LOGS=${CLEAN_LOGS:-0}
 for arg in "$@"; do
     case "$arg" in
-        --clear-logs) CLEAR_LOGS=true ;;
+        --clear-logs) CLEAN_LOGS=1 ;;
         *) echo "Usage: $0 [--clear-logs]" >&2; exit 64 ;;
     esac
 done
@@ -45,7 +46,7 @@ if declare -F validate_config >/dev/null 2>&1; then
 fi
 
 # Optionally clear logs when exiting
-if [[ "$CLEAR_LOGS" == "true" ]]; then
+if (( CLEAN_LOGS == 1 )); then
     cleanup_logs_on_exit() {
         find "$LOG_DIR" "$REPO_ROOT/config/logs" "$REPO_ROOT/scripts/logs" -type f -name '*.txt' -delete 2>/dev/null || true
     }
