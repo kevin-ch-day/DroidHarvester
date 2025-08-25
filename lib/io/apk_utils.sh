@@ -271,11 +271,16 @@ run_adb_pull_with_fallbacks() {
   timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$src" "$dst" >>"$LOGFILE" 2>&1
   rc=$?
   if (( rc != 0 )); then
-    LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying copy fallback"
+    LOG_APK="$(basename "$dst")" log WARN "direct pull failed; trying exec-out fallback"
+    timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" exec-out cat "$src" >"$dst" 2>>"$LOGFILE"
+    rc=$?
+  fi
+  if (( rc != 0 )); then
+    LOG_APK="$(basename "$dst")" log WARN "exec-out fallback failed; trying copy fallback"
     tmp="/data/local/tmp/$(basename "$dst")"
     if adb_shell cp "$src" "$tmp" >/dev/null 2>&1; then
-      log DEBUG "cmd: adb ${ADB_ARGS[*]} pull $tmp $dst"
-      timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" pull "$tmp" "$dst" >>"$LOGFILE" 2>&1
+      log DEBUG "cmd: adb ${ADB_ARGS[*]} exec-out cat $tmp > $dst"
+      timeout --preserve-status -- "$DH_PULL_TIMEOUT" adb "${ADB_ARGS[@]}" exec-out cat "$tmp" >"$dst" 2>>"$LOGFILE"
       rc=$?
       adb_shell rm -f "$tmp" >/dev/null 2>&1 || true
     else
