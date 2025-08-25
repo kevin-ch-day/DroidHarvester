@@ -103,7 +103,7 @@ while true; do
         if [[ -x "$REPO_ROOT/scripts/finalize_quickpull.sh" ]]; then
           echo "[INFO] Finalizing quick pull (friendly names + manifest)..."
           "$REPO_ROOT/scripts/finalize_quickpull.sh" || true
-          qdir="$RESULTS_DIR/$DEV/quick_pull_results"
+          qdir="$RESULTS_DIR/$DEVICE/quick_pull_results"
           if [[ -f "$qdir/manifest.csv" ]]; then
             QUICK_PULL_DIR="$(basename "$qdir")"
             PKGS_FOUND=$(tail -n +2 "$qdir/manifest.csv" | cut -d, -f3 | sort -u | wc -l | tr -d ' ')
