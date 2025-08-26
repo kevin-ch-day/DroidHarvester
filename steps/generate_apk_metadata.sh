@@ -14,7 +14,7 @@ if [[ -z "$pkg" || -z "$outfile" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "$REPO_ROOT/config/config.sh"
 # shellcheck disable=SC1090
 for m in logging/logging_engine core/errors core/trace core/device io/report; do
@@ -46,17 +46,22 @@ if [[ -f "$outfile" ]]; then
     firstInstall="unknown"
     lastUpdate="unknown"
     uid="unknown"
+    grantedPerms=""
 
     if [[ "$(basename "$outfile")" == "base.apk" ]]; then
         info=$(adb_shell dumpsys package "$pkg" 2>/dev/null || true)
-
-        version=$(awk -F= '/versionName/{print $2;exit}' <<<"$info" | xargs || true)
-        versionCode=$(awk -F'[= ]' '/versionCode/{print $2;exit}' <<<"$info" | xargs || true)
-        targetSdk=$(awk -F= '/targetSdk/{print $2;exit}' <<<"$info" | xargs || true)
-        installer=$(awk -F= '/installerPackageName/{print $2;exit}' <<<"$info" | tr -d ' ' | xargs || true)
-        firstInstall=$(awk -F= '/firstInstallTime/{print $2;exit}' <<<"$info" | xargs || true)
-        lastUpdate=$(awk -F= '/lastUpdateTime/{print $2;exit}' <<<"$info" | xargs || true)
-        uid=$(awk -F= '/userId=/{print $2;exit}' <<<"$info" | xargs || true)
+        if [[ -n "$info" ]]; then
+            version=$(awk -F= '/versionName/{print $2;exit}' <<<"$info" | xargs || true)
+            versionCode=$(awk -F'[= ]' '/versionCode/{print $2;exit}' <<<"$info" | xargs || true)
+            targetSdk=$(awk -F= '/targetSdk/{print $2;exit}' <<<"$info" | xargs || true)
+            installer=$(awk -F= '/installerPackageName/{print $2;exit}' <<<"$info" | tr -d ' ' | xargs || true)
+            firstInstall=$(awk -F= '/firstInstallTime/{print $2;exit}' <<<"$info" | xargs || true)
+            lastUpdate=$(awk -F= '/lastUpdateTime/{print $2;exit}' <<<"$info" | xargs || true)
+            uid=$(awk -F= '/userId=/{print $2;exit}' <<<"$info" | xargs || true)
+            grantedPerms=$(awk '/grantedPermissions:/{flag=1;next} /^[^ ]/{flag=0} flag{gsub(/^ +/,"",$0);print}' <<<"$info" | paste -sd',' -)
+        else
+            log WARN "dumpsys package $pkg returned empty"
+        fi
     fi
 
     installType="user"
@@ -66,21 +71,13 @@ if [[ -f "$outfile" ]]; then
     role="base"
     [[ "$(basename "$outfile")" != "base.apk" ]] && role="split"
 
-    LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "✅ Metadata for $pkg → $(basename "$outfile")"
-    log INFO "      File        : $outfile"
-    log INFO "      Role        : $role"
-    log INFO "      SHA256      : $sha256"
-    log INFO "      SHA1        : $sha1"
-    log INFO "      MD5         : $md5"
-    log INFO "      Size        : $size bytes"
-    log INFO "      Perms       : $perms"
-    log INFO "      Modified    : $mtime"
-    [[ "$version" != "unknown" ]] && log INFO "      Version     : $version (code: $versionCode, targetSdk: $targetSdk)"
-    [[ "$installer" != "unknown" ]] && log INFO "      Installer   : $installer"
-    [[ "$firstInstall" != "unknown" ]] && log INFO "      FirstInstall: $firstInstall"
-    [[ "$lastUpdate" != "unknown" ]] && log INFO "      LastUpdate  : $lastUpdate"
-    [[ "$uid" != "unknown" ]] && log INFO "      UID         : $uid"
-    log INFO "      InstallType : $installType"
+    perm_count=$( [ -n "$grantedPerms" ] && printf '%s' "$grantedPerms" | tr ',' '\n' | wc -l | tr -d ' ' || echo 0 )
+
+    LOG_PKG="$pkg" LOG_APK="$(basename "$outfile")" log INFO "Metadata for $pkg"
+    log INFO "  File       : $(basename "$outfile") ($role, ${size} bytes)"
+    [[ "$version" != "unknown" ]] && log INFO "  Version    : $version (code: $versionCode, targetSdk: $targetSdk)"
+    [[ "$installer" != "unknown" ]] && log INFO "  Installer  : $installer"
+    log INFO "  Permissions: ${grantedPerms:-none} (${perm_count})"
 
     printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
         "$(csv_escape "$pkg")" \

@@ -11,7 +11,12 @@ SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
 
 # --- Config sourcing (tolerate split or monolithic) ---
-try_source() { [[ -r "$1" ]] && source "$1" >/dev/null 2>&1 || true; } # shellcheck disable=SC1091
+# shellcheck disable=SC1090,SC1091
+try_source() {
+  if [[ -r "$1" ]]; then
+    source "$1" >/dev/null 2>&1 || true
+  fi
+}
 try_source "$REPO_ROOT/config/config.sh"
 try_source "$REPO_ROOT/config/paths.sh"
 

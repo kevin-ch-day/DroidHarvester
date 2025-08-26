@@ -12,7 +12,13 @@ SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -P "${SCRIPT_DIR}/.." && pwd)"
 
 # Configs (tolerate split)
-try_source(){ [[ -r "$1" ]] && source "$1" >/dev/null 2>&1 || true; }  # shellcheck disable=SC1091
+# shellcheck disable=SC1090,SC1091
+try_source() {
+  if [[ -r "$1" ]]; then
+    # Source optional files quietly, ignoring failures
+    source "$1" >/dev/null 2>&1 || true
+  fi
+}
 try_source "$REPO_ROOT/config/config.sh"
 try_source "$REPO_ROOT/config/paths.sh"
 try_source "$REPO_ROOT/config/packages.sh"   # optional: user-defined friendly maps
