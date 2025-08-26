@@ -8,7 +8,9 @@ trap 'echo "ERROR: ${BASH_SOURCE[0]}:$LINENO" >&2' ERR
 
 resume_last_session() {
     local last_dev
-    last_dev=$(ls -1dt "$RESULTS_DIR"/*/ 2>/dev/null | head -n1 || true)
+    # Use find instead of ls for robustness
+    last_dev=$(find "$RESULTS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null \
+        | sort -nr | head -n1 | cut -d' ' -f2- || true)
     if [[ -z "$last_dev" ]]; then
         log WARN "No previous session found."
         return

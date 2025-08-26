@@ -9,8 +9,8 @@ log_file_init "$path"
 [[ ! -e "$ROOT/log" ]]
 [[ ! -e "$ROOT/config"/log ]]
 [[ ! -e "$ROOT/scripts"/log ]]
-# ensure error logs are captured separately
-log_error "selftest error"
+# ensure error logs are captured separately without polluting test output
+log_error "selftest error" 2>/dev/null
 [[ -f "$ERRORFILE" ]]
 grep -q "selftest error" "$ERRORFILE"
 rm -f "$path"

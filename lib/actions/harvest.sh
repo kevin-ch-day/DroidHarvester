@@ -109,14 +109,17 @@ harvest() {
         return 0   # keep interactive flow; message already logged
     fi
 
-    # Iterate packages
-    local pkg
+    # Iterate packages with simple progress indicator
+    local pkg idx=0 total=${#ALL_PKGS[@]}
     for pkg in "${ALL_PKGS[@]}"; do
+        ((idx++))
+        log INFO "Analyzing [$idx/$total] $pkg"
         _harvest_one_pkg "$pkg"
     done
 
     # Finalize and advertise output locations
     finalize_report "all"
+    # shellcheck disable=SC2034
     LAST_TXT_REPORT="$TXT_REPORT"
     log SUCCESS "Harvest complete. Reports written to $RESULTS_DIR"
     logging_rotate
