@@ -13,7 +13,17 @@ BLUE="\033[0;34m"
 CYAN="\033[0;36m"
 NC="\033[0m"
 
+# Default log level controls noise.  Levels are ordered by severity
+# and can be overridden via the environment (e.g. LOG_LEVEL=DEBUG).
 : "${LOG_LEVEL:=INFO}"
+# Numeric mapping for easy comparisons
+declare -A _LOG_LEVELS=(
+    [DEBUG]=0
+    [INFO]=1
+    [SUCCESS]=1
+    [WARN]=2
+    [ERROR]=3
+)
 : "${REPO_ROOT:="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"}"
 : "${LOG_ROOT:="$REPO_ROOT/logs"}"
 LOG_DIR="$LOG_ROOT"  # Backwards compatibility
@@ -27,6 +37,10 @@ logging_init() {
     if [[ -z "${LOGFILE:-}" ]]; then
         LOGFILE="$(_log_path harvest_log)"
     fi
+    # Dedicated error transcript
+    if [[ -z "${ERRORFILE:-}" ]]; then
+        ERRORFILE="$(_log_path error_log)"
+    fi
 }
 
 _log_path() {
@@ -36,13 +50,12 @@ _log_path() {
     echo "$LOG_ROOT/${prefix}_${ts}_${epoch}.txt"
 }
 
-_log_print() {
-    local lvl="$1"; shift
-    printf '[%s][%s] %s\n' "$lvl" "$(date +%H:%M:%S)" "$*" >&2
+# Check if a level should be printed according to LOG_LEVEL
+_log_should_print() {
+    local lvl="${_LOG_LEVELS[$1]:-}"
+    local cur="${_LOG_LEVELS[$LOG_LEVEL]:-1}"
+    [[ "$lvl" -ge "$cur" ]]
 }
-_log_info() { _log_print INFO "$@"; }
-_log_warn() { _log_print WARN "$@"; }
-_log_err()  { _log_print ERR  "$@"; }
 
 logging_rotate() {
     local keep="${LOG_KEEP_N:-}"
@@ -59,33 +72,49 @@ log_file_init() {
     LOGFILE="$1"
     : > "$LOGFILE"
     log INFO "transcript: $LOGFILE"
+    # ensure error file exists when explicitly setting log file
+    if [[ -z "${ERRORFILE:-}" ]]; then
+        ERRORFILE="$(_log_path error_log)"
+    fi
 }
 
 log() {
     local level="$1"; shift
     local msg="$*"
+    _log_should_print "$level" || return 0
+
     local ts_human="$(date +'%H:%M:%S')"
     local ts_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     local dev_field="${LOG_DEV:-${DEVICE:- -}}"
     local structured="ts=$ts_iso lvl=$level sid=${SESSION_ID:- -} code=${LOG_CODE:- -} comp=${LOG_COMP:- -} func=${LOG_FUNC:- -} dev=${dev_field} pkg=${LOG_PKG:- -} apk=${LOG_APK:- -} dur_ms=${LOG_DUR_MS:- -} attempts=${LOG_ATTEMPTS:- -} rc=${LOG_RC:- -} msg=\"$msg\""
+
     local color prefix
     case "$level" in
         DEBUG)
-            [[ "$LOG_LEVEL" == "DEBUG" ]] || return 0
             color=$CYAN; prefix="DBG " ;;
         INFO)
             color=$BLUE; prefix="INFO" ;;
+        SUCCESS)
+            color=$GREEN; prefix=" OK " ;;
         WARN)
             color=$YELLOW; prefix="WARN" ;;
         ERROR)
             color=$RED; prefix="ERR " ;;
-        SUCCESS)
-            color=$GREEN; prefix=" OK " ;;
         *)
             color=""; prefix="$level" ;;
     esac
+
     echo -e "${color}[${prefix}]${NC} [$ts_human] $msg" >&2
     if [[ -n "${LOGFILE:-}" ]]; then
         echo "[${prefix}] [$ts_human] $msg | $structured" >> "$LOGFILE"
     fi
+    if [[ "$level" == "ERROR" && -n "${ERRORFILE:-}" ]]; then
+        echo "[${prefix}] [$ts_human] $msg | $structured" >> "$ERRORFILE"
+    fi
 }
+
+# Convenience wrappers for clarity
+log_debug() { log DEBUG "$@"; }
+log_info()  { log INFO  "$@"; }
+log_warn()  { log WARN  "$@"; }
+log_error() { log ERROR "$@"; }
